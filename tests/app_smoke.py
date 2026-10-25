@@ -4,9 +4,8 @@ import json
 import time
 from pathlib import Path
 
-from PIL import ImageGrab
-
 from silent_type.app import App
+from tests import screen
 
 
 class Smoke(App):
@@ -46,7 +45,7 @@ class Smoke(App):
         x, y = self.root.winfo_rootx(), self.root.winfo_rooty()
         # Capture only this application's rendered window, after preview stops.
         Path("build").mkdir(exist_ok=True)
-        ImageGrab.grab(bbox=(x, y, x + self.root.winfo_width(), y + self.root.winfo_height())).save(
+        screen.grab((x, y, x + self.root.winfo_width(), y + self.root.winfo_height())).save(
             "build/app-window.png"
         )
         print(json.dumps({"ready": self.status.get(), "live_preview": True, "preview_stopped": True}))

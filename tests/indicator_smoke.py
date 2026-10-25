@@ -7,10 +7,9 @@ import tkinter as tk
 from ctypes import wintypes as W
 from pathlib import Path
 
-from PIL import ImageGrab
-
 from silent_type import windows
 from silent_type.indicator import Indicator
+from tests import screen
 
 
 def main():
@@ -43,7 +42,7 @@ def main():
         while time.monotonic() < until:
             root.update()
             time.sleep(0.02)
-        image = ImageGrab.grab(bbox=(rect.left, rect.top, rect.right, rect.bottom))
+        image = screen.grab((rect.left, rect.top, rect.right, rect.bottom))
         assert image.getpixel((10, 10))[:3] == (74, 68, 128), "Status color was not rendered"
         assert len(image.getcolors(image.width * image.height)) > 2, "Status text was not rendered"
         Path("build").mkdir(exist_ok=True)

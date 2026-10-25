@@ -12,11 +12,10 @@ from ctypes import wintypes as W
 from pathlib import Path
 from unittest.mock import patch
 
-from PIL import ImageGrab
-
 from silent_type.app import App
 from silent_type.hold_control import PAIR
 from silent_type.state import History, settings
+from tests import screen
 
 
 class HoldPipeline(App):
@@ -56,7 +55,7 @@ class HoldPipeline(App):
 
             rect = W.RECT()
             windows.user32.GetWindowRect(self.overlay_hwnd, C.byref(rect))
-            image = ImageGrab.grab(bbox=(rect.left, rect.top, rect.right, rect.bottom))
+            image = screen.grab((rect.left, rect.top, rect.right, rect.bottom))
             assert image.getpixel((10, 10))[:3] == (20, 120, 61), (
                 "Real camera Recording color was not painted"
             )

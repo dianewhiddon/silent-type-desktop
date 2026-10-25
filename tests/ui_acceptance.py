@@ -6,11 +6,10 @@ import tkinter as tk
 from pathlib import Path
 from unittest.mock import patch
 
-from PIL import ImageGrab
-
 from silent_type.recents import Recents
 from silent_type.state import History
 from silent_type.window import MainWindow
+from tests import screen
 
 
 def capture(root, path):
@@ -21,7 +20,7 @@ def capture(root, path):
         root.update()
         time.sleep(0.02)
     x, y = root.winfo_rootx(), root.winfo_rooty()
-    ImageGrab.grab(bbox=(x, y, x + root.winfo_width(), y + root.winfo_height())).save(path)
+    screen.grab((x, y, x + root.winfo_width(), y + root.winfo_height())).save(path)
 
 
 def main():
