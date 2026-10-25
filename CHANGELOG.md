@@ -7,7 +7,8 @@ Security update. Install it in place of 0.4.1.
 - Pillow 12.3.0 → 13.0.0, fixing its critical and high image-decoding advisories.
 - certifi 2026.7.22 → 2026.10.19 (removes the distrusted emSign roots) and filelock 4.2.0 → 4.2.4 in both runtime locks and the development lock.
 - setuptools 84.0.0 → 84.1.0 in both runtime locks, with an 84.1.0 minimum.
-- No change to recognition, typing, camera or installer behavior.
+- The Start menu shortcut now opens the app's own `pythonw.exe` directly. The `start-silent-type.vbs` launcher is removed: Avast quarantined it and blocked downloads of the release ZIP that contained it. Reinstalling over 0.4.1 in the same folder updates its shortcut.
+- No change to recognition, typing or camera behavior.
 
 ## 0.4.1 — 2026-10-16
 

@@ -25,7 +25,7 @@ The approximately 1 GB lip-reading checkpoint downloads from Auto-AVSR's officia
 
 ## First use
 
-Open **Silent Type Desktop** from Start, or double-click `start-silent-type.vbs`. Right-click its tray icon and choose **Camera and settings**.
+Open **Silent Type Desktop** from Start (installed without `-NoShortcut`), or run `.venv\Scripts\pythonw.exe -m silent_type` in the app folder. Right-click its tray icon and choose **Camera and settings**.
 
 1. Choose your camera and select **Check camera**. Face forward with your mouth visible, then stop the preview.
 2. Wait for **Ready**. Use **Start recording** to test a phrase without typing into another app.

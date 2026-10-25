@@ -4,7 +4,9 @@
 
 Dependency security update: Pillow 13.0.0, certifi 2026.10.19, filelock 4.2.4 and setuptools 84.1.0 in both runtime locks; certifi and filelock in the development lock. Application code is unchanged.
 
-A fresh hash-locked CPU installation (`-NoShortcut -SkipModels`) passed `pip check`, Ruff lint and formatting, and all 74 offline tests on Windows 11 x64 with Python 3.12. Both runtime locks, the development lock and the base PyTorch version passed advisory audits. No camera, model or recognition test was repeated for this dependency-only update.
+A fresh hash-locked CPU installation (`-NoShortcut -SkipModels`) passed `pip check`, Ruff lint and formatting, and all 74 offline tests on Windows 11 x64 with Python 3.12. Both runtime locks, the development lock and the base PyTorch version passed advisory audits. No camera, model or recognition test was repeated for this update.
+
+The `start-silent-type.vbs` launcher is removed. On a Windows 11 PC running Avast, the file was quarantined within seconds of every checkout, and Avast cut off downloads of the 0.4.1 release ZIP and of a local copy that contained it, while the same archive without it downloaded intact. The Start menu shortcut now targets the installation's `pythonw.exe -m silent_type`. In an isolated profile folder, the installer created that shortcut, replaced a 0.4.1-style shortcut for the same folder, and refused, unchanged, a shortcut owned by another installation.
 
 Release assets are built from the exact commit, with hosted checks, an exported-tree secret scan and an unauthenticated SHA-256 download check recorded in the versioned release notes.
 

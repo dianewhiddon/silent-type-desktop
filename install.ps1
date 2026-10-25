@@ -13,11 +13,13 @@ if ($LASTEXITCODE -ne 0) { throw '64-bit Python 3.12 is required.' }
 
 # Preflight the shortcut before modifying the environment.
 $ShortcutPath = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Silent Type Desktop.lnk'
-$Launcher = Join-Path $PSScriptRoot 'start-silent-type.vbs'
+$AppPythonw = Join-Path $PSScriptRoot '.venv\Scripts\pythonw.exe'
+$LegacyLauncher = '"' + (Join-Path $PSScriptRoot 'start-silent-type.vbs') + '"'
 if (-not $NoShortcut) {
     $Shell = New-Object -ComObject WScript.Shell
     $Shortcut = $Shell.CreateShortcut($ShortcutPath)
-    if ((Test-Path -LiteralPath $ShortcutPath) -and $Shortcut.Arguments -ne ('"' + $Launcher + '"')) {
+    $Ours = ($Shortcut.TargetPath -eq $AppPythonw -and $Shortcut.Arguments -eq '-m silent_type') -or $Shortcut.Arguments -eq $LegacyLauncher
+    if ((Test-Path -LiteralPath $ShortcutPath) -and -not $Ours) {
         throw 'A shortcut belongs to another installation. Use -NoShortcut or remove that shortcut yourself.'
     }
 }
@@ -46,8 +48,8 @@ if (-not $SkipModels) {
 & $AppPython -m silent_type.icon
 if ($LASTEXITCODE -ne 0) { throw 'Could not draw the app icon.' }
 if (-not $NoShortcut) {
-    $Shortcut.TargetPath = Join-Path $env:WINDIR 'System32\wscript.exe'
-    $Shortcut.Arguments = '"' + $Launcher + '"'
+    $Shortcut.TargetPath = $AppPythonw
+    $Shortcut.Arguments = '-m silent_type'
     $Shortcut.WorkingDirectory = $PSScriptRoot
     $Shortcut.Description = 'Camera-only silent typing'
     $Shortcut.IconLocation = (Join-Path $PSScriptRoot 'silent_type\silent-type.ico') + ',0'
@@ -56,5 +58,5 @@ if (-not $NoShortcut) {
 if ($SkipModels) {
     Write-Output 'Dependencies installed. Run install.ps1 without -SkipModels before using the app.'
 } else {
-    Write-Output 'Installed. Open Silent Type Desktop from Start, or double-click start-silent-type.vbs. Startup remains off.'
+    Write-Output 'Installed. Open Silent Type Desktop from Start. Startup remains off.'
 }
