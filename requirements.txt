@@ -6,8 +6,8 @@ gdown==5.2.2
 mediapipe==0.10.35
 numpy==1.26.4
 opencv-contrib-python==4.11.0.86
-pillow==12.3.0
+pillow==13.0.0
 pygrabber==0.2
 pystray==0.19.5
 scikit-image==0.25.2
-setuptools>=83.0.0
+setuptools>=84.1.0

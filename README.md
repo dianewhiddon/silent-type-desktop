@@ -8,7 +8,7 @@ An experimental Windows utility, inspired by [amywork777's Lipflow](https://gith
 
 ## Download and install
 
-1. Download **Silent-Type-0.4.1-windows-source.zip** from [Releases](https://github.com/dianewhiddon/silent-type-desktop/releases). Extract it to a permanent folder you can write to.
+1. Download **Silent-Type-0.4.2-windows-source.zip** from [Releases](https://github.com/dianewhiddon/silent-type-desktop/releases). Extract it to a permanent folder you can write to.
 2. Install **64-bit Python 3.12** from [python.org](https://www.python.org/downloads/windows/) if you do not have it.
 3. Open PowerShell in the extracted folder and run:
 

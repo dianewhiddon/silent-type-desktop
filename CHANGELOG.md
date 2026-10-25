@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.2 — 2026-10-24
+
+Security update. Install it in place of 0.4.1.
+
+- Pillow 12.3.0 → 13.0.0, fixing its critical and high image-decoding advisories.
+- certifi 2026.7.22 → 2026.10.19 (removes the distrusted emSign roots) and filelock 4.2.0 → 4.2.4 in both runtime locks and the development lock.
+- setuptools 84.0.0 → 84.1.0 in both runtime locks, with an 84.1.0 minimum.
+- No change to recognition, typing, camera or installer behavior.
+
 ## 0.4.1 — 2026-10-16
 
 - Apply the shared gold action and light-gold accent palette on neutral gray surfaces.

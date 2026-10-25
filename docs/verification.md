@@ -1,5 +1,13 @@
 # Release verification
 
+## 0.4.2 · October 24, 2026
+
+Dependency security update: Pillow 13.0.0, certifi 2026.10.19, filelock 4.2.4 and setuptools 84.1.0 in both runtime locks; certifi and filelock in the development lock. Application code is unchanged.
+
+A fresh hash-locked CPU installation (`-NoShortcut -SkipModels`) passed `pip check`, Ruff lint and formatting, and all 74 offline tests on Windows 11 x64 with Python 3.12. Both runtime locks, the development lock and the base PyTorch version passed advisory audits. No camera, model or recognition test was repeated for this dependency-only update.
+
+Release assets are built from the exact commit, with hosted checks, an exported-tree secret scan and an unauthenticated SHA-256 download check recorded in the versioned release notes.
+
 ## 0.4.1 · October 16, 2026
 
 74 offline tests and the native window/history fixtures passed. Both runtime locks and the base PyTorch version passed advisory audits. Camera/model code and dependency locks are unchanged; no live camera or recognition test was repeated for this theme update.
