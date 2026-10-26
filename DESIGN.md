@@ -88,7 +88,7 @@ components:
 
 Silent Type uses light gray settings, dark text, white reading surfaces and SRC gold actions. Its dark tray recovery popup shares the neutral gray and gold theme approved for Dictate and Snip. Native geometry and workflows remain intact.
 
-The implementation is Windows Tk/ttk with the clam theme, a custom Canvas popup and a native status window. These files describe the implemented desktop system; they do not specify a web interface. The locally rendered shushing emoji remains the application icon.
+The implementation is Windows Tk/ttk with the clam theme, a custom Canvas popup and a native status window. These files describe the implemented desktop system; they do not specify a web interface. The application icon is the project's own mark: white closed lips on an SRC gold badge, drawn in code at each size.
 
 ## Colors
 
@@ -96,7 +96,7 @@ Accent identifies manual recording and popup shortcut chips; accent-dark is the 
 
 White labels on solid gold retain the approved brand exception. This pairing does not establish ordinary small-text contrast compliance.
 
-Background, surface, ink, muted and edge establish the settings hierarchy. The popup uses ink for its shell and recents-edge for its outline. Status words identify recording, progress, success and errors on the same neutral status strip. The shushing icon retains its artwork, with a gold recording dot and a light-gold working dot; off is grayscale.
+Background, surface, ink, muted and edge establish the settings hierarchy. The popup uses ink for its shell and recents-edge for its outline. Status words identify recording, progress, success and errors on the same neutral status strip. The icon adds a white dot with an ink ring while recording and an ink dot with a white ring while reading; off is grayscale. The mouth gap stays open at 16 px.
 
 ## Typography
 

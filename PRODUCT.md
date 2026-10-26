@@ -18,7 +18,7 @@ Public GitHub source and download on the author's personal profile, separate fro
 
 Preserve camera release, tray on/off, manual review, Recents copying, nonactivating status and cancellation. No microphone capture or saved video. Cloud punctuation is opt-in. Default storage and shortcuts must not overwrite older installations.
 
-Diane approved the shared public-edition theme: black, white and neutral gray with SRC gold actions, darker-gold hover and light-gold links and dark-surface details. Selections stay gray; status words sit on a neutral strip. White labels on gold retain the approved brand contrast exception. Native desktop interactions and the locally rendered shushing icon remain. Installed copies are outside this public-release change.
+Diane approved the shared public-edition theme: black, white and neutral gray with SRC gold actions, darker-gold hover and light-gold links and dark-surface details. Selections stay gray; status words sit on a neutral strip. White labels on gold retain the approved brand contrast exception. Native desktop interactions remain. The icon is white lips on a gold badge, the project's own artwork (0.4.3); no emoji or font artwork is used. Installed copies are outside this public-release change.
 
 ## Quality boundaries
 

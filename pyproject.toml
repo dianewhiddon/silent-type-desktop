@@ -1,6 +1,6 @@
 [project]
 name = "silent-type"
-version = "0.4.2"
+version = "0.4.3"
 description = "Type by mouthing the words: webcam lip reading that types at your cursor on Windows"
 requires-python = ">=3.12,<3.13"
 license = "MIT"

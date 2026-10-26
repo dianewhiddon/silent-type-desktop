@@ -1,4 +1,4 @@
-"""Tray icon: the shushing mark with state dots; left-click opens Recents.
+"""Tray icon: the lips badge with state dots; left-click opens Recents.
 
 The menu's checked "Silent Type on" item is the on/off switch.
 """

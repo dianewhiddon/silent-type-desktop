@@ -9,7 +9,7 @@
 | `camera.py` | Camera stream opened on a hold, with half-second pre-roll for follow-up phrases and close after `camera_warm_seconds`; recorded frames kept as JPEG. The webcam is exclusive, so never hold it longer. |
 | `worker.py` / `recognition.py` | Model in a separate process with time limits; face detection (MediaPipe) and Auto-AVSR decoding. |
 | `punctuate.py` | Optional Claude Haiku pass, accepted only when every word matches. |
-| `window.py`, `tray.py`, `indicator.py`, `recents.py`, `icon.py` | The settings window, tray icon and on/off switch, click-through status strip, Recents popup and the 🤫 icon, drawn from Windows' emoji font (`python -m silent_type.icon` rebuilds the ignored `silent-type.ico`). |
+| `window.py`, `tray.py`, `indicator.py`, `recents.py`, `icon.py` | The settings window, tray icon and on/off switch, click-through status strip, Recents popup and the app icon, white lips on a gold badge drawn in code (`python -m silent_type.icon` rebuilds the ignored `silent-type.ico`). |
 | `state.py`, `log.py` | Settings, history (SQLite) and the markdown log. |
 
 Rules the code holds to: no keyboard hooks, key suppression or injected modifiers (besides Unicode text, the only synthetic key is the unassigned 0xE8 menu mask); typing never touches the clipboard; input stops when the original foreground window changes; recognized words are never logged to the diagnostic log or shown on the normal status strip. The review-only acceptance mode deliberately displays its test phrase.

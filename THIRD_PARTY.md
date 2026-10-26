@@ -14,4 +14,4 @@ The face detector is Google's [MediaPipe](https://ai.google.dev/edge/mediapipe/s
 
 Dependencies are installed separately through PyPI/PyTorch. Their original notices and metadata remain in the app's isolated environment.
 
-The shushing-face icon is rendered locally from Microsoft's Segoe UI Emoji font, not included as redistributable artwork in the source or release. Repository screenshots show the application's own controls without that icon.
+The application icon is original artwork drawn by `silent_type/icon.py` and covered by this project's MIT license. No emoji, font glyph or third-party image is used.

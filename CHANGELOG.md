@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.3 — 2026-10-25
+
+- New app icon: white closed lips on a gold badge, drawn in code. It replaces the shushing-face emoji, which was Microsoft font artwork. Recording shows a white dot, reading an ink dot, and off is gray; the mouth stays readable at tray size. Reinstalling updates the Start menu icon.
+- Hardware checks read window pixels correctly on scaled displays (125–200%).
+- No change to recognition, typing, camera, dependencies or installer behavior.
+
 ## 0.4.2 — 2026-10-24
 
 Security update. Install it in place of 0.4.1.

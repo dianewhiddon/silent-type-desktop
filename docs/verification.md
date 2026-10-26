@@ -1,5 +1,9 @@
 # Release verification
 
+## 0.4.3 · October 25, 2026
+
+Icon-only release. `silent_type/icon.py` draws white closed lips on an SRC gold badge in code; no emoji font is read. Its tests check the gold badge and white lips, the open mouth gap at 16 px, distinct recording and reading dots, the grayscale off state, the ICO's embedded sizes and the absence of any font loading. The rendered states were reviewed at 16, 24, 32, 48 and 128 px on light and dark backgrounds. All 78 offline tests, lint and formatting pass on Windows 11 x64 with Python 3.12; dependencies are unchanged from 0.4.2.
+
 ## 0.4.2 · October 24, 2026
 
 Dependency security update: Pillow 13.0.0, certifi 2026.10.19, filelock 4.2.4 and setuptools 84.1.0 in both runtime locks; certifi and filelock in the development lock. Application code is unchanged.
