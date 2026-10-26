@@ -40,6 +40,8 @@ Run offline tests, lint, formatting, both dependency audits, vendor-integrity va
 
 Create a source ZIP from the verified Git commit, never from the working directory. Exclude environments, model weights, settings, keys and recordings; keep source licenses and notices. Publish the ZIP with its SHA-256, the version tag, release notes and the exact commit. Download the published asset and verify the same hash. Do not describe a source archive as a standalone executable.
 
+On a Windows PC running a consumer antivirus with web and file protection on and no exclusions for the test folders (Avast on Diane's laptop is the reference), download the published ZIP through a browser or curl, extract it, confirm the download completed and no file was quarantined, then run the installer and start the app. Antivirus heuristics can block launcher scripts or cut off a download that a developer machine accepts; Silent Type 0.4.0–0.4.1 shipped such a launcher.
+
 ## Changing dependencies
 
 Edit `requirements.txt` (or the PyTorch line in `requirements-cuda.in` / `requirements-cpu.in`), then regenerate both locks with [uv](https://docs.astral.sh/uv/). PyTorch's index serves its hashes, so nothing large downloads:
