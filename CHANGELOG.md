@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Punctuation reuses one connection, opened while the model loads, instead of loading the library and connecting again for every phrase. It cuts about 4 seconds from each phrase when punctuation is on.
+- The log records the time recognition and punctuation take, why a phrase was saved instead of typed, and, when a launch takes longer than 20 seconds, where it is stuck (`silent-type-startup-hang.txt`).
+
 ## 0.4.3 — 2026-10-25
 
 - New app icon: white closed lips on a gold badge, drawn in code. It replaces the shushing-face emoji, which was Microsoft font artwork. Recording shows a white dot, reading an ink dot, and off is gray; the mouth stays readable at tray size. Reinstalling updates the Start menu icon.

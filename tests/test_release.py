@@ -125,7 +125,7 @@ class PartLifecycleTests(unittest.TestCase):
 
 
 class PunctuationReleaseTests(unittest.TestCase):
-    def test_real_sdk_client_roundtrip_uses_completed_response_and_closes(self):
+    def test_real_sdk_client_roundtrip_uses_completed_response_and_reuses_one_client(self):
         import httpx2
 
         original = httpx2.Client
@@ -152,10 +152,13 @@ class PunctuationReleaseTests(unittest.TestCase):
                 super().__init__(transport=httpx2.MockTransport(respond), **kwargs)
                 clients.append(self)
 
+        punctuate._client = None
+        self.addCleanup(setattr, punctuate, "_client", None)
         with patch.object(httpx2, "Client", Client), patch.object(punctuate, "api_key", return_value="test"):
             self.assertEqual(punctuate.punctuate("hello there", {"punctuate": True}), "Hello there.")
+            self.assertEqual(punctuate.punctuate("hello there", {"punctuate": True}), "Hello there.")
         self.assertEqual(len(clients), 1)
-        self.assertTrue(clients[0].is_closed)
+        self.assertFalse(clients[0].is_closed)
 
     def test_no_network_without_explicit_opt_in_even_with_key(self):
         create = Mock()

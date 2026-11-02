@@ -6,6 +6,7 @@ and talk to Tk only through `post`. `busy` and `phase` are written on the Tk
 thread; other threads only read them.
 """
 
+import faulthandler
 import logging
 import os
 import queue
@@ -86,8 +87,10 @@ class App:
         else:
             self.show_indicator("Silent Type loading…", AMBER)
         self.root.after(25, self.drain)
+        faulthandler.cancel_dump_traceback_later()
         LOG.info("Started pid=%s show=%s", os.getpid(), show)
         self.spawn(self.load_model)
+        self.spawn(self.warm_punctuation)
         self.spawn(self.watch_destination)
         self.root.mainloop()
         LOG.info("Stopped pid=%s", os.getpid())
@@ -144,6 +147,11 @@ class App:
 
         self.tray = Tray(self.post, enabled=lambda: self.enabled)
         self.spawn(self.tray.run)
+
+    def warm_punctuation(self):
+        from .punctuate import warm
+
+        warm(self.config)
 
     def load_model(self):
         try:
@@ -215,9 +223,12 @@ class App:
                 other_modifier = self.hold_control and any(
                     windows.down(k) for k in MODIFIERS if k not in self.hold_control.pair
                 )
-                if self.phase == "working" and other_modifier:
+                if self.phase == "working" and other_modifier and not self.changed.is_set():
+                    LOG.info("Focus marked changed: another modifier key held")
                     self.changed.set()
-                if windows.target() != self.original:
+                current = windows.target()
+                if current != self.original and not self.changed.is_set():
+                    LOG.info("Focus marked changed: foreground %s, started in %s", current, self.original)
                     self.changed.set()
             self.stop.wait(0.02 if self.hold_control else 0.05)
 
@@ -539,6 +550,11 @@ def main():
     )
     for name in ("silent_type", "__main__"):
         logging.getLogger(name).setLevel(logging.INFO)
+    # A launch that has not reached "Started" within 20 s writes where every thread
+    # is stuck, so a slow first start after a restart can be diagnosed.
+    hang = open(data_dir() / "silent-type-startup-hang.txt", "w", encoding="utf-8")  # noqa: SIM115 (open for the process lifetime)
+    faulthandler.dump_traceback_later(20, repeat=True, file=hang)
+    LOG.info("Launching pid=%s", os.getpid())
     try:
         App(show="--show" in sys.argv)
     except Exception:

@@ -13,7 +13,7 @@ import logging
 import os
 import re
 import ssl
-from contextlib import ExitStack
+import threading
 from pathlib import Path
 
 LOG = logging.getLogger(__name__)
@@ -68,6 +68,38 @@ def same_words(punctuated, text):
     )
 
 
+_client = None
+_client_lock = threading.Lock()
+
+
+def _shared_client(key):
+    """One client for the whole session, so each phrase reuses an open connection."""
+    global _client
+    with _client_lock:
+        if _client is None:
+            import anthropic
+            import httpx2 as httpx
+
+            http = httpx.Client(verify=ssl.create_default_context())
+            _client = anthropic.Anthropic(api_key=key, http_client=http, max_retries=0, timeout=20.0)
+        return _client
+
+
+def warm(config):
+    """Load the library and open the connection before the first phrase. Never raises."""
+    key = api_key(config)
+    if not config.get("punctuate", False) or not key:
+        return
+    try:
+        _shared_client(key).messages.create(
+            model=config.get("punctuate_model", "claude-haiku-5-5"),
+            max_tokens=1,
+            messages=[{"role": "user", "content": "Hi"}],
+        )
+    except Exception as exc:
+        LOG.info("Punctuation warm-up skipped: %s", type(exc).__name__)
+
+
 def punctuate(text, config, create=None):
     """Return punctuated text, or the input unchanged on any doubt or failure."""
     if not config.get("punctuate", False) or not text.strip():
@@ -76,25 +108,17 @@ def punctuate(text, config, create=None):
     if not key:
         return text
     try:
-        with ExitStack() as stack:
-            if create is None:
-                import anthropic
-                import httpx2 as httpx
-
-                http = stack.enter_context(httpx.Client(verify=ssl.create_default_context()))
-                client = stack.enter_context(
-                    anthropic.Anthropic(
-                        api_key=key, http_client=http, max_retries=0, timeout=min(20.0, 5.0 + len(text) / 500)
-                    )
-                )
-                create = client.messages.create
-            response = create(
-                model=config.get("punctuate_model", "claude-haiku-5-5"),
-                max_tokens=min(16000, max(1000, len(text))),
-                output_config={"effort": "low"},
-                system=SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": USER_TEMPLATE.format(text=text)}],
+        if create is None:
+            create = (
+                _shared_client(key).with_options(timeout=min(20.0, 5.0 + len(text) / 500)).messages.create
             )
+        response = create(
+            model=config.get("punctuate_model", "claude-haiku-5-5"),
+            max_tokens=min(16000, max(1000, len(text))),
+            output_config={"effort": "low"},
+            system=SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": USER_TEMPLATE.format(text=text)}],
+        )
         if response.stop_reason != "end_turn":
             return text
         result = next((block.text for block in response.content if block.type == "text"), "").strip()

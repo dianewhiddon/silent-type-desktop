@@ -56,7 +56,8 @@ class PartReader:
             frames = [frame for frame, _ in part]
             times = [moment for _, moment in part]
             try:
-                text, _ = self.recognizer.decode(frames, times, cancelled=self.cancelled)
+                text, took = self.recognizer.decode(frames, times, cancelled=self.cancelled)
+                LOG.info("Part read frames=%s decode=%.1fs", len(frames), took)
                 self.results.append(text)
             except Exception as exc:
                 LOG.info("Part unreadable: %s", exc)
@@ -209,9 +210,11 @@ class Session:
         LOG.info("Recognition finishing parts=%s seconds=%.1f", parts.count, held)
         released = time.monotonic()
         text, unreadable = parts.finish()
+        LOG.info("Recognition done after %.1fs", time.monotonic() - released)
         text = format_text(text, self.config["names"])
         if text and not unreadable and not self.signals.cancelled():
             text = punctuate(text, self.config)
+            LOG.info("Punctuation done after %.1fs", time.monotonic() - released)
         if self.signals.cancelled():
             self.post("status", "Cancelled. Nothing typed.")
             return
