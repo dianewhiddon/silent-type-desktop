@@ -18,7 +18,7 @@ from . import theme, windows
 from .keywatch import KeyWatch
 from .log import log_path
 from .session import Session, Signals
-from .state import History, data_dir, save_settings, settings
+from .state import History, save_settings, settings
 
 LOG = logging.getLogger(__name__)
 IDLE_SECONDS = 1.0  # longest idle sleep; a key change or open request wakes it at once
@@ -65,6 +65,11 @@ class App:
         self.manual = False
         self.original = None
         self.recognizer = None
+        self.model_loading = True
+        self.model_error = None
+        self.camera_names = []
+        self.camera_inventory_lock = threading.Lock()
+        self.keyboard_wake = threading.Event()
         self.accepted_hold = None
         self.recents_open = False
         self.terminal_indicator = False
@@ -90,12 +95,11 @@ class App:
         else:
             self.show_indicator("Silent Type loading…", AMBER)
         self.root.after(POLL_MS, self.drain)
-        faulthandler.cancel_dump_traceback_later()
         LOG.info("Started pid=%s show=%s", os.getpid(), show)
         self.spawn(self.load_model)
         self.spawn(self.warm_punctuation)
-        self.wake = threading.Event()
-        self.keywatch = KeyWatch(self.wake, self.instance.open_event, lambda: self.post("open"))
+        self.spawn(self.refresh_cameras)
+        self.keywatch = KeyWatch(self.keyboard_wake, self.instance.open_event, lambda: self.post("open"))
         if not self.keywatch.start():
             LOG.warning("Key changes cannot wake the watcher; polling instead")
         self.spawn(self.watch_destination)
@@ -118,18 +122,9 @@ class App:
             pass
 
     def build_window(self):
-        from .recognition import cameras
         from .window import MainWindow
 
-        try:
-            camera_names = cameras()
-        except Exception:
-            LOG.exception("Camera inventory")
-            camera_names = []
-        if not self.config["camera"] and camera_names:
-            self.config["camera"] = camera_names[0]
-            if self.persist_config:
-                save_settings(self.config)
+        camera_names = [self.config["camera"]] if self.config["camera"] else []
         self.window = MainWindow(
             self.root,
             history=self.history,
@@ -141,6 +136,7 @@ class App:
             on_record=lambda: self.toggle_phrase(None, manual=True),
             on_copy=self.copy_text,
             on_hide=self.hide,
+            on_retry=self.retry_model,
             punctuate=self.config.get("punctuate", False),
             on_punctuate=self.change_punctuation,
         )
@@ -183,6 +179,33 @@ class App:
 
         warm(self.config)
 
+    def refresh_cameras(self):
+        from .camera_inventory import cameras
+
+        if not self.camera_inventory_lock.acquire(blocking=False):
+            return
+        try:
+            self.post("cameras", cameras(cancelled=self.stop.is_set))
+        except Exception as exc:
+            LOG.warning("Camera inventory: %s", exc)
+            if not self.stop.is_set():
+                self.post("status", str(exc))
+        finally:
+            self.camera_inventory_lock.release()
+
+    def retry_model(self):
+        if self.stop.is_set() or self.busy or self.model_loading:
+            return
+        if self.recognizer and not self.recognizer.closed:
+            return
+        self.model_loading = True
+        self.model_error = None
+        self.recognizer = None
+        self.window.set_model_loading(True)
+        self.status.set("Loading model…")
+        self.show_indicator("Loading model…", AMBER)
+        self.spawn(self.load_model)
+
     def load_model(self):
         try:
             from .worker import ManagedRecognizer
@@ -191,15 +214,14 @@ class App:
             if self.stop.is_set():
                 worker.close()
                 return
-            self.recognizer = worker
+            self.post("model_loaded", worker)
             control = f"Hold {self.hold_control.label()}" if self.hold_control else "Keyboard control off"
             self.post("status", f"Ready · {worker.device.upper()} · {control}")
             self.post("ready", control)
             LOG.info("Ready device=%s", worker.device)
         except Exception as exc:
             LOG.exception("Model load")
-            self.post("status", str(exc))
-            self.post("open")
+            self.post("model_failed", str(exc))
 
     # -- status strip --------------------------------------------------------------
 
@@ -274,8 +296,8 @@ class App:
         watch = getattr(self, "keywatch", None)
         if watch is not None and watch.active:
             # The timeout only covers keyboards that do not report through Raw Input.
-            self.wake.wait(IDLE_SECONDS)
-            self.wake.clear()
+            self.keyboard_wake.wait(IDLE_SECONDS)
+            self.keyboard_wake.clear()
         else:
             self.stop.wait(0.05)
 
@@ -320,9 +342,17 @@ class App:
             self.status.set("Stop the camera preview before typing.")
             return
         if self.recognizer is None:
-            LOG.info("Shortcut blocked: model still loading")
-            self.status.set("Model loading. Wait for Ready before recording.")
-            self.show_indicator("Model loading · wait for Ready", AMBER)
+            message = (
+                f"Model unavailable: {self.model_error} Use Retry model in Camera and settings."
+                if self.model_error
+                else "Model loading · wait for Ready"
+            )
+            LOG.info("Shortcut blocked: %s", message)
+            self.status.set(message)
+            self.show_indicator(
+                "Model unavailable · open settings to retry" if self.model_error else message,
+                RED if self.model_error else AMBER,
+            )
             return
         if not original and not manual:
             LOG.info("Shortcut blocked: no destination")
@@ -359,9 +389,7 @@ class App:
     def record_phrase(self):
         self.session().run()
         if self.recognizer and self.recognizer.closed and not self.stop.is_set():
-            self.recognizer = None
-            self.post("status", "Reloading model after cancellation…")
-            self.spawn(self.load_model)
+            self.post("retry_model")
 
     def deliver(self, text):
         return self.session().deliver(text)
@@ -370,9 +398,9 @@ class App:
 
     def camera_index(self):
         # Keep the name stable across USB device reorderings; never switch cameras silently.
-        from .recognition import cameras
+        from .camera_inventory import cameras
 
-        names = cameras()
+        names = cameras(cancelled=self.stop.is_set)
         if self.config["camera"] not in names:
             raise RuntimeError("Selected camera not found. Open Silent Type and choose a camera.")
         return names.index(self.config["camera"])
@@ -511,7 +539,7 @@ class App:
         self.stop.set()
         if getattr(self, "keywatch", None):
             self.keywatch.stop()
-            self.wake.set()
+            self.keyboard_wake.set()
         self.cancel.set()
         self.preview_stop.set()
         self.feed.close()
@@ -522,7 +550,34 @@ class App:
 
     def handle(self, kind, value):
         """Apply one queued event on the Tk thread. Returns False after quitting."""
-        if kind == "status":
+        if kind == "model_loaded":
+            if self.stop.is_set():
+                value.close()
+            else:
+                self.recognizer = value
+                self.model_loading = False
+                self.model_error = None
+                self.window.set_model_loading(False)
+            faulthandler.cancel_dump_traceback_later()
+        elif kind == "model_failed":
+            self.model_loading = False
+            self.model_error = value
+            self.window.set_model_loading(False, failed=True)
+            self.status.set(value + " Use Retry model after correcting the problem.")
+            self.show_outcome("Model unavailable · open settings to retry", RED)
+            self.root.deiconify()
+            faulthandler.cancel_dump_traceback_later()
+        elif kind == "retry_model":
+            self.retry_model()
+        elif kind == "cameras":
+            self.camera_names = value
+            self.window.camera_select.configure(values=value)
+            if not self.config["camera"] and value:
+                self.config["camera"] = value[0]
+                self.window.set_camera(value[0])
+                if self.persist_config:
+                    save_settings(self.config)
+        elif kind == "status":
             self.status.set(value)
             self.tray.set_title(value)
             if value.startswith(("Cancelled", "Keyboard control stopped")):
@@ -562,6 +617,8 @@ class App:
         elif kind == "history":
             self.window.refresh_history()
         elif kind == "open":
+            if not self.camera_names:
+                self.spawn(self.refresh_cameras)
             self.root.deiconify()
             self.root.lift()
         elif kind == "recents":
@@ -581,49 +638,24 @@ class App:
         return True
 
     def drain(self):
-        try:
-            while True:
-                if not self.handle(*self.events.get_nowait()):
-                    return
-        except queue.Empty:
-            pass
-        self.root.after(POLL_MS, self.drain)
+        if self.wake():
+            self.root.after(POLL_MS, self.drain)
 
     def wake(self):
         """Apply queued events when `post` asks; `drain` stays as the slow safety check."""
         try:
             while True:
-                if not self.handle(*self.events.get_nowait()):
-                    return
+                event = self.events.get_nowait()
+                try:
+                    if not self.handle(*event):
+                        return False
+                except Exception:
+                    LOG.exception("UI event failed: %s", event[0])
         except queue.Empty:
-            pass
+            return True
 
 
 def main():
     import sys
-    from logging.handlers import RotatingFileHandler
 
-    handler = RotatingFileHandler(
-        data_dir() / "silent-type.log", maxBytes=500_000, backupCount=2, encoding="utf-8"
-    )
-    logging.basicConfig(
-        handlers=[handler], level=logging.WARNING, format="%(asctime)s %(levelname)s %(message)s"
-    )
-    for name in ("silent_type", "__main__"):
-        logging.getLogger(name).setLevel(logging.INFO)
-    # A launch that has not reached "Started" within 20 s writes where every thread
-    # is stuck, so a slow first start after a restart can be diagnosed.
-    hang = open(data_dir() / "silent-type-startup-hang.txt", "w", encoding="utf-8")  # noqa: SIM115 (open for the process lifetime)
-    faulthandler.dump_traceback_later(20, repeat=True, file=hang)
-    LOG.info("Launching pid=%s", os.getpid())
-    try:
-        App(show="--show" in sys.argv)
-    except Exception:
-        LOG.exception("Application stopped unexpectedly")
-        windows.user32.MessageBoxW(
-            None,
-            "Silent Type could not start. Check settings.json and silent-type.log in the Silent Type Desktop data folder.",
-            "Silent Type",
-            0x10,
-        )
-        raise
+    App(show="--show" in sys.argv)

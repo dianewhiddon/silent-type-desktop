@@ -155,8 +155,16 @@ class PunctuationReleaseTests(unittest.TestCase):
         punctuate._client = None
         self.addCleanup(setattr, punctuate, "_client", None)
         with patch.object(httpx2, "Client", Client), patch.object(punctuate, "api_key", return_value="test"):
-            self.assertEqual(punctuate.punctuate("hello there", {"punctuate": True}), "Hello there.")
-            self.assertEqual(punctuate.punctuate("hello there", {"punctuate": True}), "Hello there.")
+            client = punctuate._shared_client("test")
+            self.addCleanup(client.close)
+            self.assertEqual(
+                punctuate.punctuate("hello there", {"punctuate": True, "punctuation_timeout": 10}),
+                "Hello there.",
+            )
+            self.assertEqual(
+                punctuate.punctuate("hello there", {"punctuate": True, "punctuation_timeout": 10}),
+                "Hello there.",
+            )
         self.assertEqual(len(clients), 1)
         self.assertFalse(clients[0].is_closed)
 

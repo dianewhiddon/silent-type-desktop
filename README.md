@@ -8,7 +8,7 @@ An experimental Windows utility, inspired by [amywork777's Lipflow](https://gith
 
 ## Download and install
 
-1. Download **Silent-Type-0.4.5-windows-source.zip** from [Releases](https://github.com/dianewhiddon/silent-type-desktop/releases). Extract it to a permanent folder you can write to.
+1. Download **Silent-Type-0.4.6-windows-source.zip** from [Releases](https://github.com/dianewhiddon/silent-type-desktop/releases). Extract it to a permanent folder you can write to.
 2. Install **64-bit Python 3.12** from [python.org](https://www.python.org/downloads/windows/) if you do not have it.
 3. Open PowerShell in the extracted folder and run:
 
@@ -48,6 +48,14 @@ Claude punctuation is **off by default**. To enable it, copy `.env.example` to `
 
 Settings, history, logs and models live in `%LOCALAPPDATA%\Silent Type Desktop`. This edition has separate storage and shortcuts from earlier private/member installations.
 
+### Storage and recovery in this version
+
+`install.ps1 -DataDirectory 'C:\absolute\folder'` writes an installation-local `data-location.json` containing only the chosen absolute path. `SILENT_TYPE_DATA_DIR` overrides it for isolated runs; without either, the original AppData location is used. Selecting a new folder does not migrate settings, history or models. Keep the locator when updating in place, or pass the same folder to the next installer. Uninstalling the source folder does not remove custom data.
+
+A missing or failed model load now offers **Retry model** after repairing the model files. Restart after editing settings. Camera discovery has a time limit and does not block the settings window. Startup failures appear in `silent-type.log`; `silent-type-startup-hang.txt` retains slow-launch traces.
+
+Punctuation is optional in settings. Its total wait defaults to two seconds (`punctuation_timeout`); on timeout or cancellation the app keeps the original recognized words. Recognition remains local and can still be slow on a CPU. The frame limiter and final-tail fixes prevent lost input frames, but do not establish a measured word-accuracy improvement.
+
 Edit `settings.json` while the app is closed. Invalid or unknown values produce an error instead of silently changing behavior.
 
 | Setting | Default | Meaning |
@@ -60,6 +68,8 @@ Edit `settings.json` while the app is closed. Invalid or unknown values produce 
 | `camera_warm_seconds` | `15` | Idle camera hold, 0–60 seconds |
 | `max_seconds` | `600` | Recording safety stop, 1–600 seconds |
 | `punctuate` | `false` | Opt in to Anthropic punctuation |
+| `punctuation_timeout` | `2.0` | Total punctuation wait in seconds, 0.1–20; keep original words when the budget expires |
+| `cache_attention` | `true` | Reuse decoder attention within a phrase; disable only for diagnostics |
 | `punctuate_model` | `claude-haiku-5-5` | Anthropic model name |
 | `names` | `[]` | Names whose casing should be restored |
 | `log_path` | empty | Optional alternate Markdown log path |
@@ -76,7 +86,7 @@ Key codes: Left/Right Ctrl 162/163, Left/Right Alt 164/165, Left/Right Windows 9
 
 ## Limits and troubleshooting
 
-- **Light your face from the front.** In a dim room a webcam lengthens its exposure and delivers about 9 frames a second instead of 25 or more. The model learned from 25, and in testing the text came out wrong until a spotlight was placed in front of the face. A lamp or a window facing you works; a window behind you does not. When the camera is under 18 fps, the strip after each phrase says "camera at N fps, add light in front of you", and the log records the rate.
+- **Light your face from the front.** In a dim room a webcam lengthens its exposure and delivers about 9 frames a second instead of 25 or more. The model learned from 25, and in testing the text came out wrong until a spotlight was placed in front of the face. A lamp or a window facing you works; a window behind you does not. When the camera is under 18 fps, the strip after each phrase says "camera at N fps, check camera and lighting", and the log records the rate.
 - **Wrong words:** test shorter phrases, face the camera and improve lighting. The model guesses words; this is not a verified accessibility replacement or an accuracy guarantee.
 - **Slow CPU:** processing may take longer than speaking. Recognition is the slow step; see [Accuracy and the beam setting](#accuracy-and-the-beam-setting). The queue is bounded; an overloaded session stops instead of accumulating video indefinitely. NVIDIA acceleration is recommended for frequent use, but no universal timing is promised.
 - **Long phrases:** recordings are read in 10-second parts. A boundary can split a word. Ten minutes is the safety ceiling, not a tested practical target.
@@ -87,7 +97,7 @@ Key codes: Left/Right Ctrl 162/163, Left/Right Alt 164/165, Left/Right Windows 9
 
 ## Update or remove
 
-Quit from the tray before updating. Extract the next release into a new permanent folder, keep the old folder until verified, and remove the old **Silent Type Desktop** shortcut before running the new installer. The installer refuses to overwrite a shortcut pointing to another installation. Data remains in its own folder.
+Quit from the tray before updating. Extract the next release into a new permanent folder, keep the old folder until verified, and remove the old **Silent Type Desktop** shortcut before running the new installer. The installer refuses to overwrite a shortcut pointing to another installation. Data remains in its own folder. If you selected a custom data folder, pass the same `-DataDirectory` when installing the update; the new source archive does not include your local locator.
 
 To uninstall, quit, turn off **Start with Windows** in the tray menu (or delete `Silent Type Desktop` from your Startup folder, which opens with `shell:startup`), then delete the installation folder and its Start-menu shortcut. To remove saved text and models too, delete `%LOCALAPPDATA%\Silent Type Desktop` and any custom log. API keys in a custom `env_file` belong to that file's owner and are not removed.
 

@@ -11,6 +11,7 @@ import logging
 import queue
 import threading
 import time
+from bisect import bisect_left
 from dataclasses import dataclass, field
 
 from . import windows
@@ -193,9 +194,13 @@ class Session:
             taken = self.feed.take()
             self.captured += len(taken)
             part += taken
-            if part and part[-1][1] - part[0][1] >= PART_SECONDS:
-                parts.add(part)
-                part = []
+            # Keep enough lookahead that release never leaves an unreadable tiny
+            # tail. The pending frames join the final part instead of being lost.
+            if part and part[-1][1] - part[0][1] >= PART_SECONDS + 0.5:
+                boundary = bisect_left([moment for _, moment in part], part[0][1] + PART_SECONDS)
+                if len(part) - boundary >= 8:
+                    parts.add(part[:boundary])
+                    part = part[boundary:]
             time.sleep(0.02)
         held = time.monotonic() - start
         tail = self.feed.end()
@@ -225,7 +230,7 @@ class Session:
             return
         if not parts.count and (held < 0.4 or len(tail) < 2):
             raise RuntimeError("Too short to read. Hold while you mouth the whole phrase.")
-        # A tail under 0.4 seconds after a full part holds no words.
+        # _record retains lookahead so the final word is not discarded at a cut.
         if len(tail) >= 2 and tail[-1][1] - tail[0][1] >= 0.4:
             parts.add(tail)
         self.post("working", held)
@@ -245,7 +250,7 @@ class Session:
         LOG.info("Recognition done after %.1fs", time.monotonic() - released)
         text = format_text(text, self.config["names"])
         if text and not unreadable and not self.signals.cancelled():
-            text = punctuate(text, self.config)
+            text = punctuate(text, self.config, cancelled=self.signals.cancelled)
             LOG.info("Punctuation done after %.1fs", time.monotonic() - released)
         if self.signals.cancelled():
             self.post("status", "Cancelled. Nothing typed.")
@@ -265,7 +270,7 @@ class Session:
         if self.dark:
             note = " · picture is very dark, add light in front of you"
         elif self.low_light:
-            note = f" · camera at {self.fps:.0f} fps, add light in front of you"
+            note = f" · camera at {self.fps:.0f} fps; check camera and lighting"
         self.post("status", f"{outcome.capitalize()} · {time.monotonic() - released:.1f}s{note}")
         self.post("result", (outcome, text, unreadable))
         self.post("history")

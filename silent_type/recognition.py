@@ -1,5 +1,6 @@
 """Official Auto-AVSR visual-only recognition; no audio stream or cloud service."""
 
+import logging
 import os
 import sys
 import threading
@@ -35,7 +36,14 @@ def open_camera(index):
     # Another app, or an earlier session, can leave the camera on a fixed exposure.
     # A short fixed exposure gives a nearly black picture the model cannot read.
     cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)  # DirectShow: the camera's own automatic exposure
-    cap.set(cv2.CAP_PROP_FPS, 25)
+    requested = cap.set(cv2.CAP_PROP_FPS, 25)
+    logging.getLogger(__name__).info(
+        "Camera format width=%.0f height=%.0f reported_fps=%.1f fps_request_accepted=%s",
+        cap.get(cv2.CAP_PROP_FRAME_WIDTH),
+        cap.get(cv2.CAP_PROP_FRAME_HEIGHT),
+        cap.get(cv2.CAP_PROP_FPS),
+        requested,
+    )
     if not cap.isOpened():
         cap.release()
         raise RuntimeError("Camera unavailable. Close other camera apps or choose another camera.")

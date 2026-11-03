@@ -27,6 +27,7 @@ class MainWindow:
         on_record,
         on_copy,
         on_hide,
+        on_retry=lambda: None,
         punctuate=False,
         on_punctuate=lambda enabled: None,
     ):
@@ -75,6 +76,8 @@ class MainWindow:
         self.camera_select.bind("<<ComboboxSelected>>", lambda _: on_camera(self.camera.get()))
         self.preview_button = ttk.Button(controls, text="Check camera", command=on_preview)
         self.preview_button.grid(row=0, column=2)
+        self.retry_button = ttk.Button(body, text="Loading model…", command=on_retry, state="disabled")
+        self.retry_button.pack(anchor="w", pady=4)
         self.record_button = ttk.Button(
             body, text="Start recording", command=on_record, style="Accent.TButton"
         )
@@ -145,6 +148,15 @@ class MainWindow:
             lambda event: [label.configure(wraplength=max(200, event.width - 48)) for label in self.wrapped],
         )
         self.refresh_history()
+
+    def set_model_loading(self, loading, failed=False):
+        if loading or failed:
+            self.retry_button.pack(anchor="w", pady=4, before=self.record_button)
+        else:
+            self.retry_button.pack_forget()
+        self.retry_button.configure(
+            text="Loading model…" if loading else "Retry model", state="normal" if failed else "disabled"
+        )
 
     def set_camera(self, name):
         self.camera.set(name)

@@ -53,8 +53,15 @@ def main():
             on_copy=copied.append,
             on_hide=lambda: None,
         )
+        window.set_model_loading(False)
         window.status.set("Ready · CPU · Hold Right Ctrl + Right Alt")
         capture(root, out / "settings.png")
+        window.set_model_loading(False, failed=True)
+        window.status.set("Model missing. Check the model path, then retry.")
+        capture(root, out / "settings-model-error.png")
+        assert str(window.retry_button.cget("state")) == "normal"
+        window.set_model_loading(False)
+        window.status.set("Ready · CPU · Hold Right Ctrl + Right Alt")
         window.copy_selected()
         assert copied and copied[0].startswith("A longer example")
         root.geometry("700x720+100+100")

@@ -1,16 +1,13 @@
 """Machine-local settings and recognized-text recovery."""
 
 import json
-import os
 import sqlite3
 from contextlib import contextmanager
 from datetime import UTC, datetime
-from pathlib import Path
 
-DATA = Path(
-    os.environ.get("SILENT_TYPE_DATA_DIR")
-    or (Path(os.environ.get("LOCALAPPDATA", Path.home())) / "Silent Type Desktop")
-)
+from .storage import data_directory
+
+DATA = data_directory("Silent Type Desktop")
 MODEL_NAME = "vsr_trlrs2lrs3vox2avsp_base.pth"
 FACE_MODEL_NAME = "blaze_face_short_range.tflite"
 
@@ -25,6 +22,8 @@ def settings():
         "camera": "",
         "device": "auto",
         "beam": 4,
+        "cache_attention": True,
+        "punctuation_timeout": 2.0,
         "max_seconds": 600,
         "hold_enabled": True,
         "hold_pair": [0xA3, 0xA5],
@@ -59,9 +58,12 @@ def validate_settings(config):
     """Reject malformed settings before opening devices or starting workers."""
     from .hold_control import HoldControl
 
-    for key in ("hold_enabled", "punctuate"):
+    for key in ("hold_enabled", "punctuate", "cache_attention"):
         if type(config[key]) is not bool:
             raise ValueError(f"{key} must be true or false.")
+    budget = config["punctuation_timeout"]
+    if type(budget) not in (int, float) or not 0.1 <= budget <= 20:
+        raise ValueError("punctuation_timeout must be between 0.1 and 20 seconds.")
     for key, low, high in (("beam", 1, 16), ("max_seconds", 1, 600), ("camera_warm_seconds", 0, 60)):
         if type(config[key]) is not int or not low <= config[key] <= high:
             raise ValueError(f"{key} must be an integer from {low} to {high}.")

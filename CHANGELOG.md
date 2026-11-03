@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.6 (November 3, 2026)
+
+- Fixed the event/callback name collision that delayed queued UI updates. Startup diagnostics now begin before heavyweight imports, retain earlier launch traces, and show a recoverable model-load failure with a Retry model button.
+- Camera discovery runs outside the UI thread in a process with a time limit. A camera near 30 fps no longer loses nearly every other frame to the frame limiter. Diagnostic logs distinguish received and retained frame rates.
+- Long recordings retain their short final tail instead of dropping the end of a word. Ten-second boundaries can still split words.
+- Optional punctuation has a two-second total budget, returns promptly on cancellation, and cannot accumulate background requests. Late, truncated or word-changing replies are ignored. The original words remain available.
+- Optional `install.ps1 -DataDirectory 'C:\absolute\folder'` pins storage independently of launcher environment changes. Existing data is not moved automatically; the local locator is excluded from Git and releases.
+- The model, beam 4, dependency locks and cautious Unicode insertion pacing are unchanged. CPU recognition can still take longer than speaking; no new word-accuracy figure is claimed.
+
 ## 0.4.5 — 2026-11-02
 
 - `beam` is back to 4. 0.4.4 set it to 1 for speed and the text was not accurate enough. The wide search is now fast without losing accuracy: the decoder computes its attention over the camera features once per phrase instead of once per word, which gives identical text in about half the time. If you ran 0.4.4, `settings.json` may now hold `"beam": 1`; change it to `4` (or delete the line).

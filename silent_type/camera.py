@@ -9,6 +9,7 @@ in memory and are discarded after each phrase. Recorded frames are kept as JPEG
 
 import collections
 import logging
+import math
 import threading
 import time
 
@@ -30,6 +31,23 @@ def decode(data):
     return cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
 
 
+class FrameSampler:
+    """Bound storage without halving a camera running close to the requested rate."""
+
+    def __init__(self, fps=30):
+        self.period = 1 / fps
+        self.next_at = None
+
+    def accept(self, now):
+        if self.next_at is None:
+            self.next_at = now + self.period
+            return True
+        if now + 0.001 < self.next_at:
+            return False
+        self.next_at += max(1, math.floor((now - self.next_at) / self.period) + 1) * self.period
+        return True
+
+
 class CameraFeed:
     def __init__(self, index_of, idle_seconds=600, preroll=0.5, max_width=640):
         self.index_of = index_of
@@ -45,6 +63,9 @@ class CameraFeed:
         self.error = None
         self.thread = None
         self.last_use = time.monotonic()
+        self.received = 0
+        self.retained = 0
+        self.record_stats = None
 
     def running(self):
         return bool(self.thread and self.thread.is_alive())
@@ -73,6 +94,9 @@ class CameraFeed:
         self.ensure()
         with self.lock:
             self.capturing = [(encode(frame), moment) for frame, moment in self.buffer]
+            self.record_stats = (
+                (time.monotonic(), self.received, self.retained) if self.live.is_set() else None
+            )
 
     def take(self):
         """Frames recorded since the last take; recording continues."""
@@ -85,7 +109,17 @@ class CameraFeed:
     def end(self):
         with self.lock:
             frames, self.capturing = self.capturing or [], None
+            stats, self.record_stats = self.record_stats, None
         self.last_use = time.monotonic()
+        if stats:
+            elapsed = self.last_use - stats[0]
+            if elapsed > 0:
+                LOG.info(
+                    "Capture cadence received=%.1ffps retained=%.1ffps seconds=%.1f",
+                    (self.received - stats[1]) / elapsed,
+                    (self.retained - stats[2]) / elapsed,
+                    elapsed,
+                )
         return frames
 
     def run(self):
@@ -98,15 +132,16 @@ class CameraFeed:
             wait_for_live_frames(cap, self.stopping.is_set)
             self.live.set()
             LOG.info("Camera live")
-            last = 0
+            sampler = FrameSampler()
             while not self.stopping.is_set():
                 ok, frame = cap.read()
                 if not ok:
                     raise RuntimeError("Camera stopped supplying frames.")
                 now = time.monotonic()
-                if now - last < 1 / 30:
+                self.received += 1
+                if not sampler.accept(now):
                     continue
-                last = now
+                self.retained += 1
                 # Bound memory even when a driver ignores requested size/FPS.
                 if frame.shape[1] > self.max_width:
                     frame = cv2.resize(
@@ -118,6 +153,8 @@ class CameraFeed:
                     while self.buffer and now - self.buffer[0][1] > self.preroll:
                         self.buffer.popleft()
                     if self.capturing is not None:
+                        if self.record_stats is None:
+                            self.record_stats = (now, self.received, self.retained)
                         self.capturing.append((encode(frame), now))
                     elif now - self.last_use > self.idle_seconds:
                         LOG.info("Camera closed after idle period")

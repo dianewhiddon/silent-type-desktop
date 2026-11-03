@@ -3,7 +3,8 @@ param(
     [string]$Python = "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe",
     [switch]$Cuda,
     [switch]$NoShortcut,
-    [switch]$SkipModels
+    [switch]$SkipModels,
+    [string]$DataDirectory
 )
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
@@ -30,6 +31,10 @@ if (-not (Test-Path -LiteralPath '.venv\Scripts\python.exe')) {
 $AppPython = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
 & $AppPython -c "import sys; sys.exit(0 if sys.version_info[:2] == (3,12) else 1)"
 if ($LASTEXITCODE -ne 0) { throw 'The existing environment uses another Python version. Rename .venv and retry.' }
+if ($DataDirectory) {
+    & $AppPython -m silent_type.storage --data-dir $DataDirectory
+    if ($LASTEXITCODE -ne 0) { throw 'Could not configure the data directory.' }
+}
 & $AppPython -m pip install --upgrade pip==26.2.1
 if ($LASTEXITCODE -ne 0) { throw 'Could not update the package installer.' }
 $Lock = if ($Cuda) { 'requirements-cuda.lock' } else { 'requirements-cpu.lock' }

@@ -18,3 +18,7 @@ settings.json
 .impeccable/review/
 silent-type-log.md
 silent_type/silent-type.ico
+
+# Installation-local paths; never publish personal data locations.
+data-location.json
+data-location.tmp

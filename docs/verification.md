@@ -1,5 +1,17 @@
 # Release verification
 
+## 0.4.6 · November 3, 2026
+
+Reliability and capture repair. The event/callback collision is fixed, camera discovery is bounded outside the UI thread, near-30-fps frames are retained, tiny final tails are kept, punctuation waits at most two seconds by default, and failed model loads have a retry state. Optional installation-local data selection prevents launcher-dependent storage changes. Model, beam 4 and dependency locks are unchanged.
+
+104 offline tests passed on Windows 11 x64 with Python 3.12 using the complete installed CPU runtime. The private and member editions each passed 98 tests with identical Python source/tests. Ruff lint/formatting and all 28 vendor provenance hashes passed. Both runtime locks, the development lock and base PyTorch 2.13.0 passed known-advisory checks; local CPU/CUDA wheel suffixes are skipped by PyPI and the base version was checked separately. The Windows certificate store was used for the local antivirus HTTPS proxy, with verification enabled.
+
+On the shared private core, the real held-key/camera/insertion check loaded and warmed the CPU model, retained 58 frames over about two seconds (28.3 fps), inserted the exact fictional sentence into its separate test editor in about 0.3 seconds, released all modifiers, and closed the camera after idle and when switched off. Cold camera start took about 3.3 seconds. Decode was deliberately replaced with fixed text for this delivery test; it establishes input/delivery behavior, not lip-reading accuracy or inference speed. The new cadence diagnostic excludes cold camera startup from its denominator.
+
+Public menu-mask and status-strip checks passed. Fictional UI fixtures exercised Copy, confirmed Clear, popup dismissal, populated/empty settings and Recents; the ready state at minimum size and actionable model-failure state were visually checked. No video was saved and no personal phrase history was used in these fixtures.
+
+Fresh source-archive installation, published-asset hash and hosted-CI receipts are recorded in the release notes after the exact commit is built. These checks do not establish improved word error rate, faster CPU decoding, actual reboot/sign-in behavior, screen-reader coverage or a fresh CUDA installation. The existing guarded Unicode insertion pacing is retained.
+
 ## 0.4.5 · November 2, 2026
 
 Accuracy and speed release. `beam` returns to 4; the decoder caches its source attention; frame preparation runs in parallel; the app reports a low camera frame rate.

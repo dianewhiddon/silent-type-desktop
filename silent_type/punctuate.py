@@ -14,6 +14,7 @@ import os
 import re
 import ssl
 import threading
+import time
 from pathlib import Path
 
 LOG = logging.getLogger(__name__)
@@ -70,6 +71,7 @@ def same_words(punctuated, text):
 
 _client = None
 _client_lock = threading.Lock()
+_request_lock = threading.Lock()
 
 
 def _shared_client(key):
@@ -100,7 +102,7 @@ def warm(config):
         LOG.info("Punctuation warm-up skipped: %s", type(exc).__name__)
 
 
-def punctuate(text, config, create=None):
+def _punctuate(text, config, create=None):
     """Return punctuated text, or the input unchanged on any doubt or failure."""
     if not config.get("punctuate", False) or not text.strip():
         return text
@@ -110,7 +112,9 @@ def punctuate(text, config, create=None):
     try:
         if create is None:
             create = (
-                _shared_client(key).with_options(timeout=min(20.0, 5.0 + len(text) / 500)).messages.create
+                _shared_client(key)
+                .with_options(timeout=config.get("punctuation_timeout", 2.0))
+                .messages.create
             )
         response = create(
             model=config.get("punctuate_model", "claude-haiku-5-5"),
@@ -129,4 +133,32 @@ def punctuate(text, config, create=None):
     if same_words(result, text):
         return result
     LOG.info("Punctuation rejected: words changed")
+    return text
+
+
+def punctuate(text, config, create=None, cancelled=lambda: False):
+    """Limit the total wait, including connection setup; never type a late result."""
+    if cancelled() or not config.get("punctuate", False) or not text.strip():
+        return text
+    if not _request_lock.acquire(blocking=False):
+        return text  # a timed-out request is still finishing; don't grow a backlog
+    finished = threading.Event()
+    result = [text]
+
+    def request():
+        try:
+            result[0] = _punctuate(text, config, create)
+        finally:
+            _request_lock.release()
+            finished.set()
+
+    threading.Thread(target=request, daemon=True).start()
+    deadline = time.monotonic() + config.get("punctuation_timeout", 2.0)
+    while not cancelled():
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            LOG.info("Punctuation skipped: total time budget reached")
+            return text
+        if finished.wait(min(0.05, remaining)):
+            return text if cancelled() else result[0]
     return text
