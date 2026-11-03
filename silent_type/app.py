@@ -143,10 +143,27 @@ class App:
         self.overlay_hwnd = self.strip.hwnd
 
     def build_tray(self):
+        from . import startup
         from .tray import Tray
 
-        self.tray = Tray(self.post, enabled=lambda: self.enabled)
+        self.tray = Tray(self.post, enabled=lambda: self.enabled, startup=startup.enabled)
         self.spawn(self.tray.run)
+
+    def toggle_startup(self):
+        from . import startup
+
+        try:
+            on = startup.toggle()
+        except Exception:
+            LOG.exception("Start with Windows")
+            self.show_indicator("Could not change Start with Windows", RED, 6)
+            return
+        LOG.info("Start with Windows %s", "on" if on else "off")
+        self.show_indicator(
+            "Silent Type starts with Windows" if on else "Silent Type no longer starts with Windows",
+            VIOLET,
+            6,
+        )
 
     def warm_punctuation(self):
         from .punctuate import warm
@@ -516,6 +533,8 @@ class App:
             self.root.lift()
         elif kind == "recents":
             self.show_recents()
+        elif kind == "startup":
+            self.toggle_startup()
         elif kind == "open_log":
             self.open_log()
         elif kind == "preview" and not self.preview_stop.is_set():

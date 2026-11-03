@@ -24,7 +24,7 @@ def settings():
     defaults = {
         "camera": "",
         "device": "auto",
-        "beam": 4,
+        "beam": 1,
         "max_seconds": 600,
         "hold_enabled": True,
         "hold_pair": [0xA3, 0xA5],

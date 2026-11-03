@@ -7,7 +7,7 @@ from .icon import mark
 
 
 class Tray:
-    def __init__(self, post, enabled=lambda: True):
+    def __init__(self, post, enabled=lambda: True, startup=lambda: False):
         import pystray
 
         self.images = {state: mark(64, state) for state in ("ready", "recording", "working", "off")}
@@ -18,6 +18,9 @@ class Tray:
             menu=pystray.Menu(
                 pystray.MenuItem("Recent phrases", lambda *_: post("recents"), default=True),
                 pystray.MenuItem("Silent Type on", lambda *_: post("toggle"), checked=lambda _: enabled()),
+                pystray.MenuItem(
+                    "Start with Windows", lambda *_: post("startup"), checked=lambda _: startup()
+                ),
                 pystray.Menu.SEPARATOR,
                 pystray.MenuItem("Open the full log", lambda *_: post("open_log")),
                 pystray.MenuItem("Camera and settings", lambda *_: post("open")),

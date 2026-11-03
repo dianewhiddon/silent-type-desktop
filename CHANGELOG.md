@@ -1,9 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.4.4 — 2026-11-02
 
-- Punctuation reuses one connection, opened while the model loads, instead of loading the library and connecting again for every phrase. It cuts about 4 seconds from each phrase when punctuation is on.
-- The log records the time recognition and punctuation take, why a phrase was saved instead of typed, and, when a launch takes longer than 20 seconds, where it is stuck (`silent-type-startup-hang.txt`).
+- Recognition now defaults to `beam` 1. On a CPU, a 10-second clip took about 5 seconds to read at 1 and about 13 at 4, and the text still read well. Most computers run on the CPU, so the wait after each phrase was too long at 4. If you have an NVIDIA graphics card or a very fast computer, you can raise `beam` in `settings.json`; the README explains the tradeoff. A `settings.json` that already sets `beam` keeps its value.
+- The tray menu has **Start with Windows**. It adds or removes a shortcut in your Startup folder and does nothing else. It stays off until you choose it.
+- Punctuation (when you opt in) reuses one connection, opened while the model loads, instead of loading the library and connecting again for every phrase. It cuts about 4 seconds from each phrase.
+- The log records how long recognition and punctuation take, why a phrase was saved instead of typed, and, when a launch takes longer than 20 seconds, where it is stuck (`silent-type-startup-hang.txt`).
+- No change to the model, camera, typing guards, dependencies or installer.
 
 ## 0.4.3 — 2026-10-25
 

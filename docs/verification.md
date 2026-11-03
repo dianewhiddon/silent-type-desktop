@@ -1,5 +1,15 @@
 # Release verification
 
+## 0.4.4 · November 2, 2026
+
+Speed and startup release. Recognition defaults to `beam` 1, punctuation reuses one connection, and the tray menu gains **Start with Windows**.
+
+80 offline tests, Ruff lint and Ruff formatting passed on Windows 11 x64 with Python 3.12. The new tests create and remove a real Startup shortcut in a temporary folder and read back its target, arguments and working directory; one existing punctuation test now checks that two phrases share one client. Both runtime locks and the dependencies are unchanged.
+
+Timing was measured on one laptop (8-thread Intel Core i7-11370H, CPU only) with the same recognition code: the search step took about 10 seconds of a 14-second read for a 10-second clip at `beam` 4, and a 10-second clip read in about 5 seconds at `beam` 1. Words read at `beam` 1 were judged accurate by the owner in everyday phrases; this is not an accuracy measurement, and no accuracy claim is made. Real camera, held-key and insertion tests were run on the owner's installation of the same code, not repeated on this edition's installation.
+
+The README explains the beam tradeoff for faster computers. The Startup shortcut was created by the same function on the owner's installation and read back; the tray menu item itself was not clicked in a live session for this release.
+
 ## 0.4.3 · October 25, 2026
 
 Icon-only release. `silent_type/icon.py` draws white closed lips on an SRC gold badge in code; no emoji font is read. Its tests check the gold badge and white lips, the open mouth gap at 16 px, distinct recording and reading dots, the grayscale off state, the ICO's embedded sizes and the absence of any font loading. The rendered states were reviewed at 16, 24, 32, 48 and 128 px on light and dark backgrounds. All 78 offline tests, lint and formatting pass on Windows 11 x64 with Python 3.12; dependencies are unchanged from 0.4.2.
