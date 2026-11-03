@@ -56,3 +56,7 @@ No AI models from Chinese organizations, as a dependency or an optional backend.
 ## CI
 
 [`.github/workflows/checks.yml`](.github/workflows/checks.yml) runs lint, formatting, offline tests, package consistency and dependency audits on Windows for main pushes and pull requests. Actions are pinned to exact commits and receive read-only repository access; checkout credentials are not persisted.
+
+## CPU preparation comparison
+
+[docs/cpu-preparation.md](docs/cpu-preparation.md) describes the opt-in experiment, invariant checks and manual camera comparison. The shipped default is off.

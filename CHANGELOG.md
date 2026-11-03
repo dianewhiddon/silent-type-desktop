@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.7 (November 3, 2026)
+
+- Add experimental CPU face/crop/frontend preparation during recording, off by default. Keep the complete encoder input, model and beam 4 unchanged.
+- Bound pending preparation, invalidate changed crop/context inputs, and discard cached video on cancellation. Preserve complete-part fallback and final typing guards.
+- Add stage timings and paired synthetic, face-fixture, subprocess and prompted-camera comparison tools. Automated pairs matched exactly; live camera comparison is deferred and no natural-speech accuracy improvement is claimed.
+- Document usage telemetry in the existing MediaPipe wheel, based on the upstream maintainer's explanation. Dependencies are unchanged.
+
 ## 0.4.6 (November 3, 2026)
 
 - Fixed the event/callback name collision that delayed queued UI updates. Startup diagnostics now begin before heavyweight imports, retain earlier launch traces, and show a recoverable model-load failure with a Retry model button.

@@ -8,7 +8,7 @@ An experimental Windows utility, inspired by [amywork777's Lipflow](https://gith
 
 ## Download and install
 
-1. Download **Silent-Type-0.4.6-windows-source.zip** from [Releases](https://github.com/dianewhiddon/silent-type-desktop/releases). Extract it to a permanent folder you can write to.
+1. Download **Silent-Type-0.4.7-windows-source.zip** from [Releases](https://github.com/dianewhiddon/silent-type-desktop/releases). Extract it to a permanent folder you can write to.
 2. Install **64-bit Python 3.12** from [python.org](https://www.python.org/downloads/windows/) if you do not have it.
 3. Open PowerShell in the extracted folder and run:
 
@@ -40,7 +40,7 @@ The camera opens on demand. A cold start can take a few seconds; wait for Record
 
 ## Privacy and punctuation
 
-Recognition and face detection run locally. Video stays in memory, including a half-second buffer while the camera is warm, and is never saved by the app. Text is saved locally in recovery history and a Markdown log. There is no app telemetry.
+Recognition and face detection run locally. Video stays in memory, including a half-second buffer while the camera is warm, and is never saved by the app. Text is saved locally in recovery history and a Markdown log. The bundled MediaPipe wheel collects usage telemetry. Its maintainers say input data is not sent, and offer no telemetry opt-out API. See [the upstream explanation](https://github.com/google-ai-edge/mediapipe/issues/6291#issuecomment-4896121772). Recognition runs locally; this is not a promise of zero network traffic. Removing that dependency telemetry requires a separately verified build or replacement.
 
 Claude punctuation is **off by default**. To enable it, copy `.env.example` to `.env`, add your Anthropic API key, and check **Use Claude for punctuation** in settings. This sends recognized text to Anthropic and incurs API usage charges. The response is accepted only if the words stay the same and the response completed; otherwise the original text is kept. Turn the setting off to keep recognition entirely local.
 
@@ -108,3 +108,7 @@ The camera-only silent-typing idea came from **Lipflow**, not this project. Sile
 **Auto-AVSR** provides the recognition work. Credit: Pingchuan Ma, Alexandros Haliassos, Adriana Fernandez-Lopez, Honglie Chen, Stavros Petridis and Maja Pantic, Imperial College London. The application is MIT-licensed; vendored recognition code is Apache 2.0. Model terms are separate. See [LICENSE](LICENSE) and [THIRD_PARTY.md](THIRD_PARTY.md).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture and checks, [SECURITY.md](SECURITY.md) for private reports, and [verification](docs/verification.md) for tested behavior and remaining limits.
+
+### Experimental CPU preparation
+
+Early visual preparation is available but **off by default**, pending a live paired accuracy/speed comparison. The model and beam 4 are unchanged. See [the comparison guide](docs/cpu-preparation.md) for the test window, measured fixture results and opt-in setting.

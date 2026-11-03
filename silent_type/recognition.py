@@ -16,6 +16,10 @@ sys.path.insert(0, str(VENDOR))
 sys.path.insert(0, str(VENDOR / "preparation" / "detectors" / "mediapipe"))
 
 
+class UnreadableVideo(RuntimeError):
+    """An incomplete or unusable visual input, rather than a model execution fault."""
+
+
 def cameras():
     from comtypes import CoInitialize, CoUninitialize
     from pygrabber.dshow_graph import FilterGraph
@@ -143,6 +147,8 @@ class Recognizer:
 
         self.torch = torch
         self.local = threading.local()
+        self.preparation = None
+        self.last_timings = {}
         self.pool = ThreadPoolExecutor(max_workers=min(4, os.cpu_count() or 1))
         torch.set_num_threads(min(2, torch.get_num_threads()))
         if config["device"] == "cuda" and not torch.cuda.is_available():
@@ -218,48 +224,110 @@ class Recognizer:
         # Eyes, nose tip and mouth: the four points Auto-AVSR aligns on.
         return rgb, np.array([[p.x * w, p.y * h] for p in found.keypoints[:4]])
 
+    def prefetch(self, frames, timestamps):
+        """Prepare an unfinished part; failed speculation falls back to normal decoding."""
+        from .streaming import Preparation
+
+        if self.preparation is None or self.preparation.origin != timestamps[0]:
+            self.preparation = Preparation(self, timestamps[0])
+        try:
+            self.preparation.update(frames, timestamps)
+        except UnreadableVideo:
+            # A partial view may be too short or lack a face. Final decode applies
+            # the original validation to the complete recording.
+            return
+        except Exception:
+            self.preparation = None
+            raise
+
     def decode(self, frames, timestamps):
+        start = time.monotonic()
+        self.last_timings = {}
+        preparation = getattr(self, "preparation", None)
+        try:
+            if preparation is not None and preparation.origin == timestamps[0]:
+                features = preparation.update(frames, timestamps, final=True)
+                prepared = time.monotonic()
+                text = self.decode_features(features)
+                self.last_timings["reused_frames"] = preparation.features.reused_frames
+            else:
+                mouths = self.prepare_mouths(frames, timestamps)
+                prepared = time.monotonic()
+                text = self.decode_mouths(mouths)
+            elapsed = time.monotonic() - start
+            self.last_timings.update(preparation_seconds=prepared - start, total_seconds=elapsed)
+            logging.getLogger(__name__).info("Recognition stages %s", self.last_timings)
+            return text, elapsed
+        finally:
+            self.preparation = None  # release RGB frames and features between parts
+
+    def prepare_mouths(self, frames, timestamps, cache=None):
         from video_process import VideoProcess
 
-        start = time.monotonic()
         # Model training assumes 25 FPS. Sample by actual capture times, not camera metadata.
         if len(frames) < 8 or timestamps[-1] - timestamps[0] < 0.4:
-            raise RuntimeError("Phrase too short. Wait for Recording, then mouth a short sentence.")
+            raise UnreadableVideo("Phrase too short. Wait for Recording, then mouth a short sentence.")
         ticks = np.arange(timestamps[0], timestamps[-1], 1 / 25)
         indices = np.searchsorted(timestamps, ticks).clip(0, len(frames) - 1)
         # A slow camera repeats a frame; read and search each distinct frame once, in
         # parallel (the image and detector libraries release Python's lock).
         distinct = sorted(set(indices.tolist()))
-        prepared = dict(
-            zip(distinct, self.pool.map(lambda i: self.prepare(frames[i]), distinct), strict=True)
-        )
+        cache = {} if cache is None else cache
+        missing = []
+        for i in distinct:
+            held = cache.get(i)
+            if held is None or held[0] != timestamps[i] or not np.array_equal(held[1], frames[i]):
+                missing.append(i)
+        for i, value in zip(missing, self.pool.map(lambda i: self.prepare(frames[i]), missing), strict=True):
+            frame = frames[i] if isinstance(frames[i], bytes) else frames[i].copy()
+            cache[i] = (timestamps[i], frame, value)
+        prepared = {i: cache[i][2] for i in distinct}
         rgb = np.array([prepared[i][0] for i in indices])
         landmarks = [prepared[i][1] for i in indices]
         valid = sum(point is not None for point in landmarks)
         if valid / len(landmarks) < 0.8:
-            raise RuntimeError(
+            raise UnreadableVideo(
                 "Face was not visible throughout the phrase. Check camera alignment and lighting."
             )
         mouths = VideoProcess()(rgb, landmarks)
         if mouths is None:
-            raise RuntimeError("No face found.")
-        text = self.decode_mouths(mouths)
-        return text, time.monotonic() - start
+            raise UnreadableVideo("No face found.")
+        return mouths
 
-    def decode_mouths(self, mouths):
-        """Also accepts upstream's already cropped mouth fixture for diagnostics."""
+    def frontend_features(self, mouths):
+        """The unchanged finite-context visual frontend, also used by early preparation."""
         if mouths.ndim != 3 or mouths.shape[1:] != (96, 96):
             raise RuntimeError("Mouth crop has an unexpected shape.")
         mouths = mouths[:, 4:92, 4:92].copy()
         torch = self.torch
         tensor = torch.from_numpy(mouths).float().unsqueeze(1).to(self.device)
         tensor = (tensor / 255 - 0.421) / 0.165
+        with torch.inference_mode():
+            return self.model.frontend(tensor.unsqueeze(0))
+
+    def decode_mouths(self, mouths):
+        """Reference whole-part path; keep it available for paired benchmarks."""
+        start = time.monotonic()
+        features = self.frontend_features(mouths)
+        frontend_seconds = time.monotonic() - start
+        text = self.decode_features(features)
+        self.last_timings["frontend_seconds"] = frontend_seconds
+        return text
+
+    def decode_features(self, features):
+        """Keep the full encoder context and the original beam search unchanged."""
+        torch = self.torch
         self.searches[0] += 1
         with torch.inference_mode():
-            x = self.model.frontend(tensor.unsqueeze(0))
-            x = self.model.proj_encoder(x)
+            start = time.monotonic()
+            x = self.model.proj_encoder(features)
             encoded, _ = self.model.encoder(x, None)
+            encoded_at = time.monotonic()
             hypotheses = self.beam(encoded.squeeze(0))
+        self.last_timings = {
+            "encoder_seconds": encoded_at - start,
+            "search_seconds": time.monotonic() - encoded_at,
+        }
         if not hypotheses:
             raise RuntimeError("No words recognized.")
         seq = hypotheses[0].yseq[1:].tolist()

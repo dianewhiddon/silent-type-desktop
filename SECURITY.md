@@ -12,3 +12,7 @@ Focus checks reduce accidental insertion; they cannot provide an atomic guarante
 Model files are loaded with PyTorch's `weights_only=True`, after checking the pinned digest. The digest verifies this project's expected bytes; it does not establish model license rights. Dependencies and model updates require explicit source and provenance review.
 
 Never put keys, real phrases, database files or camera footage in an issue. Report a suspected problem privately to diane@swayrisecreative.com with the version and a fictional reproduction. The current release is the supported version; there is no guaranteed response time.
+
+## Dependency telemetry
+
+The bundled MediaPipe wheel collects usage telemetry. Its maintainers say input data is not sent, and offer no telemetry opt-out API. See [the upstream explanation](https://github.com/google-ai-edge/mediapipe/issues/6291#issuecomment-4896121772). Recognition runs locally; this is not a promise of zero network traffic. Removing that dependency telemetry requires a separately verified build or replacement.

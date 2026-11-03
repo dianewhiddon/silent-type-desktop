@@ -42,11 +42,14 @@ class PartReader:
     as soon as the keys release. A cut can fall inside a word.
     """
 
-    def __init__(self, recognizer, cancelled):
+    def __init__(self, recognizer, cancelled, streaming=False):
         self.recognizer = recognizer
         self.abort = threading.Event()
         self.cancelled = lambda: self.abort.is_set() or cancelled()
         self.queue = queue.Queue(maxsize=3)
+        self.streaming = streaming
+        self.pending = None
+        self.pending_lock = threading.Lock()
         self.results = []
         self.count = 0
         self.finished = False
@@ -60,8 +63,36 @@ class PartReader:
             raise RuntimeError("Recognition cannot keep up. Try shorter phrases or a faster device.") from exc
         self.count += 1
 
+    def preview(self, part):
+        """Keep at most one speculative snapshot; finished parts always take priority."""
+        if self.streaming and part and not self.cancelled():
+            with self.pending_lock:
+                self.pending = list(part)
+
+    def _prefetch(self):
+        with self.pending_lock:
+            part, self.pending = self.pending, None
+        if part and not self.cancelled():
+            try:
+                self.recognizer.prefetch(
+                    [frame for frame, _ in part], [moment for _, moment in part], cancelled=self.cancelled
+                )
+            except Exception:
+                LOG.exception("Early preparation skipped; complete-part recognition will retry")
+                self.streaming = False
+
     def run(self):
-        while (part := self.queue.get()) is not None:
+        while True:
+            try:
+                part = self.queue.get(timeout=0.05)
+            except queue.Empty:
+                self._prefetch()
+                continue
+            if part is None:
+                return
+            with self.pending_lock:
+                if self.pending and self.pending[0][1] <= part[-1][1]:
+                    self.pending = None
             if self.cancelled():
                 continue
             frames = [frame for frame, _ in part]
@@ -79,6 +110,8 @@ class PartReader:
     def close(self):
         """Cancel in-flight decoding and release queued video on every exit path."""
         self.abort.set()
+        with self.pending_lock:
+            self.pending = None
         while True:
             try:
                 self.queue.get_nowait()
@@ -86,6 +119,12 @@ class PartReader:
                 break
         self.queue.put_nowait(None)
         self.thread.join(timeout=4)
+        discard = getattr(self.recognizer, "discard", None)
+        if discard is not None and not self.thread.is_alive():
+            try:
+                discard()
+            except Exception:
+                LOG.exception("Could not clear early preparation")
 
     def finish(self):
         """Joined text and the number of unreadable parts."""
@@ -182,6 +221,7 @@ class Session:
     def _record(self, parts):
         """Capture until release, handing full parts to the reader. Returns seconds held."""
         start = time.monotonic()
+        preview_at = start + 1
         part = []
         self.captured = 0
         while not self.signals.ended():
@@ -201,6 +241,9 @@ class Session:
                 if len(part) - boundary >= 8:
                     parts.add(part[:boundary])
                     part = part[boundary:]
+            if time.monotonic() >= preview_at:
+                parts.preview(part)
+                preview_at = time.monotonic() + 1
             time.sleep(0.02)
         held = time.monotonic() - start
         tail = self.feed.end()
@@ -216,7 +259,12 @@ class Session:
             return
         self.post("recording")
         LOG.info("Recording started")
-        parts = PartReader(self.recognizer, self.signals.cancelled)
+        parts = PartReader(
+            self.recognizer,
+            self.signals.cancelled,
+            streaming=self.config.get("streaming_preparation", False)
+            and getattr(self.recognizer, "device", "cpu") == "cpu",
+        )
         try:
             self._read_parts(parts)
         finally:

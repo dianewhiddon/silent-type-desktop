@@ -31,8 +31,15 @@ def run(connection, config):
             if request[0] == "quit":
                 break
             try:
-                text, elapsed = recognizer.decode(request[1], request[2])
-                connection.send(("text", text, elapsed))
+                if request[0] == "discard":
+                    recognizer.preparation = None
+                    connection.send(("discarded",))
+                elif request[0] == "prefetch":
+                    recognizer.prefetch(request[1], request[2])
+                    connection.send(("prepared",))
+                else:
+                    text, elapsed = recognizer.decode(request[1], request[2])
+                    connection.send(("text", text, elapsed))
             except Exception as exc:
                 connection.send(("error", str(exc)))
             finally:
@@ -81,23 +88,35 @@ class ManagedRecognizer:
         self.close()
         raise RuntimeError("Recognition timed out. Nothing typed.")
 
+    def discard(self):
+        """Release speculative video when a phrase ends without a final decode."""
+        if not self.closed:
+            self._exchange("discard", [], [], lambda: False, timeout=2)
+
+    def prefetch(self, frames, timestamps, cancelled=lambda: False):
+        self._exchange("prefetch", frames, timestamps, cancelled)
+
     def decode(self, frames, timestamps, cancelled=lambda: False):
+        answer = self._exchange("decode", frames, timestamps, cancelled)
+        return answer[1], answer[2]
+
+    def _exchange(self, command, frames, timestamps, cancelled, timeout=30):
         # A blocked pipe transfer must also be cancellable and time-limited.
         def send():
             try:
-                self.connection.send(("decode", frames, timestamps))
+                self.connection.send((command, frames, timestamps))
             except (EOFError, BrokenPipeError, OSError):
                 self.close()
 
         sender = threading.Thread(target=send, daemon=True)
         sender.start()
         try:
-            answer = self.wait(30, cancelled)
+            answer = self.wait(timeout, cancelled)
         finally:
             sender.join(timeout=2)
         if answer[0] == "error":
             raise RuntimeError(answer[1])
-        return answer[1], answer[2]
+        return answer
 
     def close(self):
         if self.closed:

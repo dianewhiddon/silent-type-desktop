@@ -1,5 +1,17 @@
 # Release verification
 
+## 0.4.7 · November 3, 2026
+
+Experimental CPU preparation ships off by default. Early face/crop/frontend work preserves the complete encoder and beam-4 search. Cached features are reused only when every crop and temporal-context input matches; cancellation discards pending and worker-owned video. Model weights, vendored source, dependency locks and insertion behavior are unchanged.
+
+116 public offline tests and 110 tests in each private/member edition passed, along with Ruff lint/formatting, package consistency and all 28 vendor hashes. The public TLS fixture initially failed inside the restricted account because it could not access Avast's existing proxy handle; the unchanged suite passed under the normal Windows identity. CPU/CUDA runtime, development and base PyTorch advisory audits passed (local wheel suffixes are skipped by PyPI; the base version was audited separately).
+
+Four synthetic pairs (including a two-part recording) and four warmed animated-face pairs produced bitwise-identical frontend features and identical transcripts. The real worker protocol also matched transcripts before/after prefetch and after explicit cache discard, then shut down. [The comparison guide](cpu-preparation.md) records fixture timing and its limits. These are not natural-speech accuracy measurements.
+
+The owner deferred the three-phrase camera comparison. No camera, keyboard-insertion or reboot test was repeated for this release; the new setting remains false. Fresh source installation, hosted checks and published-asset readback are recorded in release notes against the exact commit. Existing rendered app UI is unchanged from 0.4.6; the new prompted benchmark window awaits live acceptance.
+
+MediaPipe's binary wheel attempted a usage-telemetry connection while processing the bundled public face fixture. The upstream maintainer confirms telemetry, says input data is not sent, and provides no opt-out API. README and SECURITY now disclose this existing dependency limitation. No dependency, firewall or antivirus setting was changed.
+
 ## 0.4.6 · November 3, 2026
 
 Reliability and capture repair. The event/callback collision is fixed, camera discovery is bounded outside the UI thread, near-30-fps frames are retained, tiny final tails are kept, punctuation waits at most two seconds by default, and failed model loads have a retry state. Optional installation-local data selection prevents launcher-dependent storage changes. Model, beam 4 and dependency locks are unchanged.

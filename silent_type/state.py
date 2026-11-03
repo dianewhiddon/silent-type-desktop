@@ -23,6 +23,7 @@ def settings():
         "device": "auto",
         "beam": 4,
         "cache_attention": True,
+        "streaming_preparation": False,
         "punctuation_timeout": 2.0,
         "max_seconds": 600,
         "hold_enabled": True,
@@ -58,7 +59,7 @@ def validate_settings(config):
     """Reject malformed settings before opening devices or starting workers."""
     from .hold_control import HoldControl
 
-    for key in ("hold_enabled", "punctuate", "cache_attention"):
+    for key in ("hold_enabled", "punctuate", "cache_attention", "streaming_preparation"):
         if type(config[key]) is not bool:
             raise ValueError(f"{key} must be true or false.")
     budget = config["punctuation_timeout"]
