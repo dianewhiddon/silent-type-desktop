@@ -32,6 +32,9 @@ def open_camera(index):
     cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    # Another app, or an earlier session, can leave the camera on a fixed exposure.
+    # A short fixed exposure gives a nearly black picture the model cannot read.
+    cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)  # DirectShow: the camera's own automatic exposure
     cap.set(cv2.CAP_PROP_FPS, 25)
     if not cap.isOpened():
         cap.release()

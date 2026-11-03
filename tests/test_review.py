@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import Mock, call
 
 from silent_type.app import POLL_MS, App
-from silent_type.session import Session, Signals
+from silent_type.session import Session, Signals, picture_brightness
 
 
 class ReviewTests(unittest.TestCase):
@@ -93,3 +93,39 @@ class ReviewTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LightWarningTests(unittest.TestCase):
+    def failing_session(self, dark):
+        post = Mock()
+        session = Session(
+            feed=Mock(),
+            recognizer=None,
+            config={},
+            history=None,
+            signals=Signals(),
+            post=post,
+            destination=(1, 2),
+        )
+        session.dark = dark
+        session._run = Mock(side_effect=RuntimeError("Face was not visible throughout the phrase."))
+        session.run()
+        return post
+
+    def test_a_dark_picture_is_named_when_the_face_is_not_found(self):
+        post = self.failing_session(dark=True)
+        status = next(call.args[1] for call in post.call_args_list if call.args[0] == "status")
+        self.assertIn("Face was not visible", status)
+        self.assertIn("very dark", status)
+
+    def test_a_lit_picture_gets_the_plain_message(self):
+        post = self.failing_session(dark=False)
+        status = next(call.args[1] for call in post.call_args_list if call.args[0] == "status")
+        self.assertNotIn("dark", status)
+
+    def test_brightness_is_read_from_a_frame_and_defaults_to_bright(self):
+        import numpy as np
+
+        self.assertEqual(picture_brightness(np.full((4, 4, 3), 40, dtype=np.uint8)), 40.0)
+        self.assertEqual(picture_brightness(None), 255.0)
+        self.assertEqual(picture_brightness(Mock()), 255.0)

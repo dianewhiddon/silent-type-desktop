@@ -15,11 +15,13 @@ import time
 import tkinter as tk
 
 from . import theme, windows
+from .keywatch import KeyWatch
 from .log import log_path
 from .session import Session, Signals
 from .state import History, data_dir, save_settings, settings
 
 LOG = logging.getLogger(__name__)
+IDLE_SECONDS = 1.0  # longest idle sleep; a key change or open request wakes it at once
 POLL_MS = 250  # safety check only; posted events wake the window at once
 RED, GREEN, AMBER, VIOLET = theme.ERROR, theme.SUCCESS, theme.WORKING, theme.STATUS
 MENU_KEYS = frozenset((0xA4, 0xA5, 0x5B, 0x5C))  # Alt and Windows open menus on a lone release
@@ -92,6 +94,10 @@ class App:
         LOG.info("Started pid=%s show=%s", os.getpid(), show)
         self.spawn(self.load_model)
         self.spawn(self.warm_punctuation)
+        self.wake = threading.Event()
+        self.keywatch = KeyWatch(self.wake, self.instance.open_event, lambda: self.post("open"))
+        if not self.keywatch.start():
+            LOG.warning("Key changes cannot wake the watcher; polling instead")
         self.spawn(self.watch_destination)
         self.root.mainloop()
         LOG.info("Stopped pid=%s", os.getpid())
@@ -240,6 +246,8 @@ class App:
                     self.post(
                         "status", "Keyboard control stopped. Nothing typed; manual controls remain available."
                     )
+            else:
+                keys = frozenset()
             if self.busy and not self.manual:
                 if windows.down(0x1B):
                     self.cancel.set()
@@ -255,10 +263,21 @@ class App:
                 if current != self.original and not self.changed.is_set():
                     LOG.info("Focus marked changed: foreground %s, started in %s", current, self.original)
                     self.changed.set()
-            # Check quickly while a shortcut is forming or a phrase is running; idle, 20 times
-            # a second is plenty and the app draws far less power.
             forming = self.hold_control and self.hold_control.state in ("pending", "active")
-            self.stop.wait(0.02 if self.hold_control and (self.busy or keys or forming) else 0.05)
+            if self.hold_control and (self.busy or keys or forming):
+                self.stop.wait(0.02)  # a shortcut is forming or a phrase is running: watch closely
+            else:
+                self.sleep_until_needed()
+
+    def sleep_until_needed(self):
+        """Idle: nothing to read until a key changes or a second launch asks to open the window."""
+        watch = getattr(self, "keywatch", None)
+        if watch is not None and watch.active:
+            # The timeout only covers keyboards that do not report through Raw Input.
+            self.wake.wait(IDLE_SECONDS)
+            self.wake.clear()
+        else:
+            self.stop.wait(0.05)
 
     def hold_event(self, kind, value):
         if kind == "hold_start":
@@ -490,6 +509,9 @@ class App:
 
     def quit(self):
         self.stop.set()
+        if getattr(self, "keywatch", None):
+            self.keywatch.stop()
+            self.wake.set()
         self.cancel.set()
         self.preview_stop.set()
         self.feed.close()

@@ -22,6 +22,15 @@ from .worker import Cancelled
 LOG = logging.getLogger(__name__)
 PART_SECONDS = 10
 LOW_FPS = 18
+DARK_BRIGHTNESS = 20  # of 255; a lit face at a webcam averages well above this
+
+
+def picture_brightness(frame):
+    """Average brightness of the camera's last frame out of 255; 255 when there is none to judge."""
+    try:
+        return float(frame.mean())
+    except (AttributeError, TypeError):
+        return 255.0
 
 
 class PartReader:
@@ -139,6 +148,7 @@ class Session:
         self.captured = 0
         self.fps = 0.0
         self.low_light = False
+        self.dark = False
 
     def run(self):
         try:
@@ -149,8 +159,11 @@ class Session:
             self.post("error", str(exc))
         except Exception as exc:
             LOG.exception("Phrase")
-            self.post("status", str(exc))
-            self.post("error", str(exc))
+            message = str(exc)
+            if self.dark:  # the usual reason a face is "not visible" is a picture too dark to find it in
+                message += " The picture is very dark; add light in front of you."
+            self.post("status", message)
+            self.post("error", message)
         finally:
             self.feed.end()
             self.post("idle")
@@ -219,8 +232,12 @@ class Session:
         # The model learned from 25 frames a second. A camera in dim light stretches
         # its exposure and delivers far fewer, and reading gets much worse.
         fps = self.captured / held if held > 0 else 0
+        brightness = picture_brightness(getattr(self.feed, "latest", None))
+        self.dark = held >= 1.5 and brightness < DARK_BRIGHTNESS
         self.low_light = held >= 1.5 and fps < LOW_FPS
-        LOG.info("Camera delivered %.1f fps over %.1fs", fps, held)
+        LOG.info(
+            "Camera delivered %.1f fps over %.1fs, picture brightness %.0f of 255", fps, held, brightness
+        )
         self.fps = fps
         LOG.info("Recognition finishing parts=%s seconds=%.1f", parts.count, held)
         released = time.monotonic()
@@ -244,7 +261,11 @@ class Session:
         self.history.mark(item, outcome)
         LOG.info("Delivery outcome=%s", outcome)
         # The phrase itself stays off the strip and tray tooltip; Recents shows it.
-        note = f" · camera at {self.fps:.0f} fps, add light in front of you" if self.low_light else ""
+        note = ""
+        if self.dark:
+            note = " · picture is very dark, add light in front of you"
+        elif self.low_light:
+            note = f" · camera at {self.fps:.0f} fps, add light in front of you"
         self.post("status", f"{outcome.capitalize()} · {time.monotonic() - released:.1f}s{note}")
         self.post("result", (outcome, text, unreadable))
         self.post("history")
