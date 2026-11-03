@@ -1,7 +1,10 @@
 """Official Auto-AVSR visual-only recognition; no audio stream or cloud service."""
 
+import os
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -34,6 +37,40 @@ def open_camera(index):
         cap.release()
         raise RuntimeError("Camera unavailable. Close other camera apps or choose another camera.")
     return cap
+
+
+def cache_source_attention(decoder, searches):
+    """Compute each decoder layer's source-attention keys and values once per phrase.
+
+    The beam search hands the decoder the same encoder output on every word step,
+    expanded across hypotheses, and each layer re-projects it each time. That
+    repeated projection is most of the search time. The projection of an identical
+    input is identical, so reusing it changes no score. `searches` is a one-item
+    list whose counter changes when a new phrase is searched, which drops the cache.
+    """
+    import math
+
+    for layer in decoder.decoders:
+        attn = layer.src_attn
+        original = attn.forward
+        held = {}
+
+        def forward(query, key, value, mask, rtn_attn=False, attn=attn, original=original, held=held):
+            if key is not value or not (key.shape[0] == 1 or key.stride(0) == 0):
+                return original(query, key, value, mask, rtn_attn)
+            if held.get("search") != searches[0]:
+                one = key[:1]
+                held["k"] = attn.linear_k(one).view(1, -1, attn.h, attn.d_k).transpose(1, 2)
+                held["v"] = attn.linear_v(one).view(1, -1, attn.h, attn.d_k).transpose(1, 2)
+                held["search"] = searches[0]
+            count = query.size(0)
+            q = attn.linear_q(query).view(count, -1, attn.h, attn.d_k).transpose(1, 2)
+            k = held["k"].expand(count, -1, -1, -1)
+            v = held["v"].expand(count, -1, -1, -1)
+            scores = q.matmul(k.transpose(-2, -1)) / math.sqrt(attn.d_k)
+            return attn.forward_attention(v, scores, mask, rtn_attn)
+
+        attn.forward = forward
 
 
 def nearest_face(detections):
@@ -94,6 +131,8 @@ class Recognizer:
         from espnet.nets.scorers.length_bonus import LengthBonus
 
         self.torch = torch
+        self.local = threading.local()
+        self.pool = ThreadPoolExecutor(max_workers=min(4, os.cpu_count() or 1))
         torch.set_num_threads(min(2, torch.get_num_threads()))
         if config["device"] == "cuda" and not torch.cuda.is_available():
             raise RuntimeError(
@@ -125,6 +164,9 @@ class Recognizer:
         state = torch.load(path, map_location="cpu", weights_only=True)
         self.model.load_state_dict(state.get("state_dict", state), strict=True)
         self.model.to(self.device).eval()
+        self.searches = [0]
+        if config.get("cache_attention", True):
+            cache_source_attention(self.model.decoder, self.searches)
         scorers = self.model.scorers()
         scorers.update(lm=None, length_bonus=LengthBonus(len(self.tokens)))
         self.beam = (
@@ -142,9 +184,30 @@ class Recognizer:
             .eval()
         )
 
-    def decode(self, frames, timestamps):
+    def detector(self):
+        """One face detector per worker thread, built once and kept for the session."""
+        found = getattr(self.local, "detector", None)
+        if found is None:
+            found = self.local.detector = face_detector(self.face_model)
+        return found
+
+    def prepare(self, frame):
+        """RGB pixels and the four face landmarks for one camera frame, or None without a face."""
         import cv2
         import mediapipe as mp
+
+        if isinstance(frame, bytes):
+            frame = cv2.imdecode(np.frombuffer(frame, np.uint8), cv2.IMREAD_COLOR)
+        rgb = np.ascontiguousarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+        found = nearest_face(self.detector().detect(image).detections)
+        if not found:
+            return rgb, None
+        h, w = rgb.shape[:2]
+        # Eyes, nose tip and mouth: the four points Auto-AVSR aligns on.
+        return rgb, np.array([[p.x * w, p.y * h] for p in found.keypoints[:4]])
+
+    def decode(self, frames, timestamps):
         from video_process import VideoProcess
 
         start = time.monotonic()
@@ -153,18 +216,14 @@ class Recognizer:
             raise RuntimeError("Phrase too short. Wait for Recording, then mouth a short sentence.")
         ticks = np.arange(timestamps[0], timestamps[-1], 1 / 25)
         indices = np.searchsorted(timestamps, ticks).clip(0, len(frames) - 1)
-        rgb = np.array([cv2.cvtColor(frames[i], cv2.COLOR_BGR2RGB) for i in indices])
-        landmarks = []
-        with face_detector(self.face_model) as detector:
-            for frame in rgb:
-                image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np.ascontiguousarray(frame))
-                found = nearest_face(detector.detect(image).detections)
-                if not found:
-                    landmarks.append(None)
-                    continue
-                h, w = frame.shape[:2]
-                # Eyes, nose tip and mouth: the four points Auto-AVSR aligns on.
-                landmarks.append(np.array([[p.x * w, p.y * h] for p in found.keypoints[:4]]))
+        # A slow camera repeats a frame; read and search each distinct frame once, in
+        # parallel (the image and detector libraries release Python's lock).
+        distinct = sorted(set(indices.tolist()))
+        prepared = dict(
+            zip(distinct, self.pool.map(lambda i: self.prepare(frames[i]), distinct), strict=True)
+        )
+        rgb = np.array([prepared[i][0] for i in indices])
+        landmarks = [prepared[i][1] for i in indices]
         valid = sum(point is not None for point in landmarks)
         if valid / len(landmarks) < 0.8:
             raise RuntimeError(
@@ -184,6 +243,7 @@ class Recognizer:
         torch = self.torch
         tensor = torch.from_numpy(mouths).float().unsqueeze(1).to(self.device)
         tensor = (tensor / 255 - 0.421) / 0.165
+        self.searches[0] += 1
         with torch.inference_mode():
             x = self.model.frontend(tensor.unsqueeze(0))
             x = self.model.proj_encoder(x)

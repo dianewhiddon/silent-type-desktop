@@ -8,7 +8,7 @@ An experimental Windows utility, inspired by [amywork777's Lipflow](https://gith
 
 ## Download and install
 
-1. Download **Silent-Type-0.4.4-windows-source.zip** from [Releases](https://github.com/dianewhiddon/silent-type-desktop/releases). Extract it to a permanent folder you can write to.
+1. Download **Silent-Type-0.4.5-windows-source.zip** from [Releases](https://github.com/dianewhiddon/silent-type-desktop/releases). Extract it to a permanent folder you can write to.
 2. Install **64-bit Python 3.12** from [python.org](https://www.python.org/downloads/windows/) if you do not have it.
 3. Open PowerShell in the extracted folder and run:
 
@@ -54,7 +54,7 @@ Edit `settings.json` while the app is closed. Invalid or unknown values produce 
 |---|---|---|
 | `camera` | first available | Camera name; choose in the app |
 | `device` | `auto` | `auto`, `cpu` or `cuda`; explicit CUDA fails if unavailable |
-| `beam` | `1` | Recognition search width, 1–16. Lower is faster; see [Speed and the beam setting](#speed-and-the-beam-setting) |
+| `beam` | `4` | Recognition search width, 1–16. Wider is more accurate and slower; see [Accuracy and the beam setting](#accuracy-and-the-beam-setting) |
 | `hold_enabled` | `true` | Enable the held-key control |
 | `hold_pair` | `[163,165]` | Two distinct Ctrl, Alt or Windows key codes |
 | `camera_warm_seconds` | `15` | Idle camera hold, 0–60 seconds |
@@ -68,18 +68,17 @@ Edit `settings.json` while the app is closed. Invalid or unknown values produce 
 
 Key codes: Left/Right Ctrl 162/163, Left/Right Alt 164/165, Left/Right Windows 91/92. Left Ctrl + Left Windows is reserved for Dictate; Left Ctrl + Right Alt is rejected because AltGr can generate it. Some laptops need a different pair.
 
-### Speed and the beam setting
+### Accuracy and the beam setting
 
-`beam` is how many alternative readings the model weighs before it settles on the words. Silent Type Desktop defaults it to **1**, the fastest, because most computers run recognition on the CPU and a wider search makes the wait after each phrase too long to use. On one 8-thread laptop CPU, reading a 10-second clip took about 5 seconds at 1 and about 13 seconds at 4. In everyday phrases the text read well at 1.
-
-A wider search (2 to 16) can help with hard-to-read phrases, but it costs time. If you have an NVIDIA graphics card or a very fast computer, try `"beam": 4` in `settings.json` and compare. If you want faster still, keep it at 1.
+`beam` is how many alternative readings the model weighs before it settles on the words. It defaults to **4**. A narrower search is faster but noticeably less accurate: 0.4.4 defaulted to 1 for speed and the text was not accurate enough, so 0.4.5 restores 4 and makes it fast another way (the decoder reuses its attention over the camera features instead of recomputing it for every word, which gives identical text in about half the time). If you ran 0.4.4, your `settings.json` may now hold `"beam": 1`; change it to `4` or delete the line. A wider search (up to 16) can help with hard phrases but costs time.
 
 **Clear history** removes the recovery database's phrases. It does not delete the separate Markdown log, exported text, system backups or filesystem snapshots. Delete those separately if needed.
 
 ## Limits and troubleshooting
 
+- **Light your face from the front.** In a dim room a webcam lengthens its exposure and delivers about 9 frames a second instead of 25 or more. The model learned from 25, and in testing the text came out wrong until a spotlight was placed in front of the face. A lamp or a window facing you works; a window behind you does not. When the camera is under 18 fps, the strip after each phrase says "camera at N fps, add light in front of you", and the log records the rate.
 - **Wrong words:** test shorter phrases, face the camera and improve lighting. The model guesses words; this is not a verified accessibility replacement or an accuracy guarantee.
-- **Slow CPU:** processing may take longer than speaking. Keep `beam` at 1, its default, and see [Speed and the beam setting](#speed-and-the-beam-setting). The queue is bounded; an overloaded session stops instead of accumulating video indefinitely. NVIDIA acceleration is recommended for frequent use, but no universal timing is promised.
+- **Slow CPU:** processing may take longer than speaking. Recognition is the slow step; see [Accuracy and the beam setting](#accuracy-and-the-beam-setting). The queue is bounded; an overloaded session stops instead of accumulating video indefinitely. NVIDIA acceleration is recommended for frequent use, but no universal timing is promised.
 - **Long phrases:** recordings are read in 10-second parts. A boundary can split a word. Ten minutes is the safety ceiling, not a tested practical target.
 - **Saved, not typed:** recover from Recents. The guard follows the foreground window, not individual fields inside it. Switching fields within the same window is not detected. Focus changes during insertion can leave partial text.
 - **App menus or elevated apps:** menu state and Windows input restrictions can block insertion. Do not run the app as administrator to bypass them.

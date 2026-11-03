@@ -21,6 +21,7 @@ from .worker import Cancelled
 
 LOG = logging.getLogger(__name__)
 PART_SECONDS = 10
+LOW_FPS = 18
 
 
 class PartReader:
@@ -135,6 +136,9 @@ class Session:
         self.manual = manual
         self.review_only = review_only
         self.insert = insert  # None means windows.insert, looked up when typing
+        self.captured = 0
+        self.fps = 0.0
+        self.low_light = False
 
     def run(self):
         try:
@@ -165,6 +169,7 @@ class Session:
         """Capture until release, handing full parts to the reader. Returns seconds held."""
         start = time.monotonic()
         part = []
+        self.captured = 0
         while not self.signals.ended():
             self._check_camera("Camera stopped supplying frames. Phrase cancelled.")
             if time.monotonic() - start > self.config["max_seconds"]:
@@ -172,13 +177,17 @@ class Session:
                 LOG.info("Recording limit reached")
                 self.signals.finish.set()
                 break
-            part += self.feed.take()
+            taken = self.feed.take()
+            self.captured += len(taken)
+            part += taken
             if part and part[-1][1] - part[0][1] >= PART_SECONDS:
                 parts.add(part)
                 part = []
             time.sleep(0.02)
         held = time.monotonic() - start
-        part += self.feed.end()
+        tail = self.feed.end()
+        self.captured += len(tail)
+        part += tail
         return held, part
 
     def _run(self):
@@ -207,6 +216,12 @@ class Session:
         if len(tail) >= 2 and tail[-1][1] - tail[0][1] >= 0.4:
             parts.add(tail)
         self.post("working", held)
+        # The model learned from 25 frames a second. A camera in dim light stretches
+        # its exposure and delivers far fewer, and reading gets much worse.
+        fps = self.captured / held if held > 0 else 0
+        self.low_light = held >= 1.5 and fps < LOW_FPS
+        LOG.info("Camera delivered %.1f fps over %.1fs", fps, held)
+        self.fps = fps
         LOG.info("Recognition finishing parts=%s seconds=%.1f", parts.count, held)
         released = time.monotonic()
         text, unreadable = parts.finish()
@@ -229,7 +244,8 @@ class Session:
         self.history.mark(item, outcome)
         LOG.info("Delivery outcome=%s", outcome)
         # The phrase itself stays off the strip and tray tooltip; Recents shows it.
-        self.post("status", f"{outcome.capitalize()} · {time.monotonic() - released:.1f}s")
+        note = f" · camera at {self.fps:.0f} fps, add light in front of you" if self.low_light else ""
+        self.post("status", f"{outcome.capitalize()} · {time.monotonic() - released:.1f}s{note}")
         self.post("result", (outcome, text, unreadable))
         self.post("history")
 

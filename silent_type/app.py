@@ -20,6 +20,7 @@ from .session import Session, Signals
 from .state import History, data_dir, save_settings, settings
 
 LOG = logging.getLogger(__name__)
+POLL_MS = 250  # safety check only; posted events wake the window at once
 RED, GREEN, AMBER, VIOLET = theme.ERROR, theme.SUCCESS, theme.WORKING, theme.STATUS
 MENU_KEYS = frozenset((0xA4, 0xA5, 0x5B, 0x5C))  # Alt and Windows open menus on a lone release
 
@@ -86,7 +87,7 @@ class App:
             self.root.after(200, self.root.deiconify)
         else:
             self.show_indicator("Silent Type loading…", AMBER)
-        self.root.after(25, self.drain)
+        self.root.after(POLL_MS, self.drain)
         faulthandler.cancel_dump_traceback_later()
         LOG.info("Started pid=%s show=%s", os.getpid(), show)
         self.spawn(self.load_model)
@@ -103,6 +104,12 @@ class App:
 
     def post(self, kind, value=None):
         self.events.put((kind, value))
+        try:
+            # Wake the window thread now, so it can sleep between events instead of
+            # looking for work. Tk queues a call from another thread for its main loop.
+            self.root.after(0, self.wake)
+        except Exception:  # noqa: S110 (window not built yet or already closed; the slow check below covers it)
+            pass
 
     def build_window(self):
         from .recognition import cameras
@@ -214,6 +221,7 @@ class App:
         """Background watcher: reads key state by polling, never hooks or injects."""
         from .hold_control import MODIFIERS
 
+        keys = frozenset()
         while not self.stop.is_set():
             if self.instance.open_requested():
                 self.post("open")
@@ -247,7 +255,10 @@ class App:
                 if current != self.original and not self.changed.is_set():
                     LOG.info("Focus marked changed: foreground %s, started in %s", current, self.original)
                     self.changed.set()
-            self.stop.wait(0.02 if self.hold_control else 0.05)
+            # Check quickly while a shortcut is forming or a phrase is running; idle, 20 times
+            # a second is plenty and the app draws far less power.
+            forming = self.hold_control and self.hold_control.state in ("pending", "active")
+            self.stop.wait(0.02 if self.hold_control and (self.busy or keys or forming) else 0.05)
 
     def hold_event(self, kind, value):
         if kind == "hold_start":
@@ -554,7 +565,16 @@ class App:
                     return
         except queue.Empty:
             pass
-        self.root.after(25, self.drain)
+        self.root.after(POLL_MS, self.drain)
+
+    def wake(self):
+        """Apply queued events when `post` asks; `drain` stays as the slow safety check."""
+        try:
+            while True:
+                if not self.handle(*self.events.get_nowait()):
+                    return
+        except queue.Empty:
+            pass
 
 
 def main():

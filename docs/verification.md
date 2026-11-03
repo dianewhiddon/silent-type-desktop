@@ -1,5 +1,13 @@
 # Release verification
 
+## 0.4.5 · November 2, 2026
+
+Accuracy and speed release. `beam` returns to 4; the decoder caches its source attention; frame preparation runs in parallel; the app reports a low camera frame rate.
+
+82 offline tests, Ruff lint and Ruff formatting passed on Windows 11 x64 with Python 3.12. New tests prove the attention cache gives the same output as the original for every search step and drops when a new phrase starts, and that each distinct frame is searched once with results in the right order and RGB colors. The text was compared with and without the cache on three synthetic mouth sequences at beam 1 and beam 4 and was identical. Dependencies and locks are unchanged.
+
+Measured on one laptop (8-thread Intel Core i7-11370H, CPU only, other apps running): a 10-second clip at beam 4 took about 8 to 14 seconds before the cache and about 4 to 7 after; preparing 240 real camera frames took about 1.0 to 1.2 seconds serially and about 0.3 to 0.6 in parallel; idle use fell from about 1.6% to about 0.55% of one core (key check slowed when idle; the window thread now waits for posted events). A simulated Right Ctrl + Right Alt hold on the owner's installation of the same code started a phrase, opened the camera, recorded, reported the frame rate and returned the correct "face not visible" error in a dark room. The owner's installation of the same code read noticeably better with a spotlight in front of the face; the camera delivered about 9 fps in the dim room and about 30 with light. No accuracy figure is claimed.
+
 ## 0.4.4 · November 2, 2026
 
 Speed and startup release. Recognition defaults to `beam` 1, punctuation reuses one connection, and the tray menu gains **Start with Windows**.

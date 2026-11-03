@@ -1,8 +1,8 @@
 import queue
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
-from silent_type.app import App
+from silent_type.app import POLL_MS, App
 from silent_type.session import Session, Signals
 
 
@@ -73,7 +73,8 @@ class ReviewTests(unittest.TestCase):
         app.drain()
         self.assertIn("Hello there", app.show_indicator.call_args.args[0])
         app.hide_indicator.assert_not_called()
-        app.root.after.assert_called_once_with(25, app.drain)
+        timers = [c for c in app.root.after.call_args_list if c.args[1] != app.wake]
+        self.assertEqual(timers, [call(POLL_MS, app.drain)])
 
     def test_normal_use_clears_the_result_after_a_few_seconds(self):
         app = self.fixture()

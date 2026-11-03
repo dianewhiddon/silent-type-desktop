@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.5 — 2026-11-02
+
+- `beam` is back to 4. 0.4.4 set it to 1 for speed and the text was not accurate enough. The wide search is now fast without losing accuracy: the decoder computes its attention over the camera features once per phrase instead of once per word, which gives identical text in about half the time. If you ran 0.4.4, `settings.json` may now hold `"beam": 1`; change it to `4` (or delete the line).
+- Faster after you let go: each camera frame is read, converted and searched for your face by several threads at once, each distinct frame once, and the face detector is built once per session instead of once per 10-second part. On 240 real frames this took about 0.3 to 0.6 seconds instead of 1.0 to 1.2. The text is unchanged.
+- The model warms up before the app says Ready, so the first phrase is as fast as the rest.
+- Light on your face matters. In a dim room a webcam lengthens its exposure and delivers about 9 frames a second instead of 25 or more, and the text came out wrong until a spotlight was placed in front of the face. The strip after each phrase now says "camera at N fps, add light in front of you" when the camera is under 18 fps, and the log records the frame rate. The README says to light your face from the front.
+- Lower idle cost, which helps battery. The idle key check runs 20 times a second instead of 50 and speeds up when a key is pressed, and the window no longer looks for work 40 times a second: it sleeps until something is posted to it, with a slow 4-per-second safety check. Idle use fell from about 1.6% to about 0.55% of one processor core.
+
 ## 0.4.4 — 2026-11-02
 
 - Recognition now defaults to `beam` 1. On a CPU, a 10-second clip took about 5 seconds to read at 1 and about 13 at 4, and the text still read well. Most computers run on the CPU, so the wait after each phrase was too long at 4. If you have an NVIDIA graphics card or a very fast computer, you can raise `beam` in `settings.json`; the README explains the tradeoff. A `settings.json` that already sets `beam` keeps its value.

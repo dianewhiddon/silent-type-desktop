@@ -14,6 +14,14 @@ def run(connection, config):
         from .recognition import Recognizer
 
         recognizer = Recognizer(config)
+        try:
+            # The first search after loading runs slowly while the math libraries
+            # set up; do it now so the first phrase is as fast as the rest.
+            import numpy as np
+
+            recognizer.decode_mouths(np.zeros((25, 96, 96), dtype=np.uint8))
+        except Exception:
+            pass
         connection.send(("ready", recognizer.device))
         while True:
             try:
@@ -23,10 +31,7 @@ def run(connection, config):
             if request[0] == "quit":
                 break
             try:
-                from .camera import decode
-
-                frames = [decode(frame) if isinstance(frame, bytes) else frame for frame in request[1]]
-                text, elapsed = recognizer.decode(frames, request[2])
+                text, elapsed = recognizer.decode(request[1], request[2])
                 connection.send(("text", text, elapsed))
             except Exception as exc:
                 connection.send(("error", str(exc)))
