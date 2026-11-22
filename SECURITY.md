@@ -11,7 +11,7 @@ Focus checks reduce accidental insertion; they cannot provide an atomic guarante
 
 Model files are loaded with PyTorch's `weights_only=True`, after checking the pinned digest. The digest verifies this project's expected bytes; it does not establish model license rights. Dependencies and model updates require explicit source and provenance review.
 
-Never put keys, real phrases, database files or camera footage in an issue. Report a suspected problem privately to diane@swayrisecreative.com with the version and a fictional reproduction. The current release is the supported version; there is no guaranteed response time.
+Never put keys, real phrases, database files or camera footage in an issue. Report a suspected problem through [GitHub private vulnerability reporting](https://github.com/dianewhiddon/silent-type-desktop/security/advisories/new) with the version and a fictional reproduction. The current release is the supported version; there is no guaranteed response time.
 
 ## Dependency telemetry
 
